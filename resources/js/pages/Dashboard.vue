@@ -14,20 +14,27 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 // Props
-const { manifests, totalEarnings, rounds, parcelTypes, flash } = defineProps<{
-    manifests: Array<{
-        id: number;
-        delivery_date: string;
-        round_id: string;
-        quantities: Array<{
-            parcel_type_id: number;
-            name: string;
-            manifested: number;
-            re_manifested: number;
-            carried_forward: number;
-            total: number;
+const { groupedManifests, totalEarnings, rounds, parcelTypes, flash } = defineProps<{
+    groupedManifests: Array<{
+        period_name: string;
+        dates: Array<{
+            date: string;
+            manifests: Array<{
+                id: number;
+                delivery_date: string;
+                round_id: string;
+                quantities: Array<{
+                    parcel_type_id: number;
+                    name: string;
+                    manifested: number;
+                    re_manifested: number;
+                    carried_forward: number;
+                    total: number;
+                    value: number;
+                }>;
+                total_value: number;
+            }>;
         }>;
-        total_value: number;
     }>;
     totalEarnings: number;
     rounds: Array<{ id: number; round_id: string; name: string }>;
@@ -328,13 +335,14 @@ function formatDate(dateStr: string): string {
             <!-- Manifest Summary -->
             <h2 class="text-xl font-semibold mb-4">Manifest Summary</h2>
             <p class="mb-6 text-lg">Total Earnings: <span class="font-bold">£{{ totalEarnings.toFixed(2) }}</span></p>
-            <div v-if="manifests.length === 0" class="text-gray-400">
+            <div v-if="groupedManifests.length === 0" class="text-gray-400">
                 No manifests available.
             </div>
             <div v-else class="bg-gray-800 rounded-lg shadow-lg overflow-x-auto">
                 <table class="w-full border border-gray-600">
                     <thead>
                         <tr class="bg-gray-700">
+                            <th class="p-3 text-left text-sm font-medium">Period</th>
                             <th class="p-3 text-left text-sm font-medium">Date</th>
                             <th class="p-3 text-left text-sm font-medium">Round</th>
                             <th v-for="type in parcelTypes" :key="type.id" class="p-3 text-left text-sm font-medium">{{ type.name }}</th>
@@ -343,24 +351,67 @@ function formatDate(dateStr: string): string {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="manifest in manifests" :key="manifest.id" class="border-b border-gray-600">
-                            <td class="p-3">{{ formatDate(manifest.delivery_date) }}</td>
-                            <td class="p-3">{{ manifest.round_id }}</td>
-                            <td v-for="quantity in manifest.quantities" :key="quantity.parcel_type_id" class="p-3">{{ quantity.total }}</td>
-                            <td class="p-3">£{{ manifest.total_value.toFixed(2) }}</td>
+                        <tr v-for="(period, pIndex) in groupedManifests" :key="period.period_name" class="border-b border-gray-600">
+                            <td class="p-3 font-semibold" :class="{ 'border-t border-gray-600': pIndex > 0 }">
+                                {{ period.period_name }}
+                            </td>
                             <td class="p-3">
-                                <button
-                                    @click="editManifest(manifest.id)"
-                                    class="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold px-2 py-0.5 rounded-md mr-1 text-xs"
-                                >
-                                    Edit
-                                </button>
-                                <button
-                                    @click="deleteManifest(manifest.id, manifest.delivery_date)"
-                                    class="bg-red-600 hover:bg-red-700 text-white font-semibold px-2 py-0.5 rounded-md text-xs"
-                                >
-                                    Delete
-                                </button>
+                                <!-- Iterate over dates -->
+                                <div v-for="(date, dIndex) in period.dates" :key="date.date" class="border-b border-gray-600 last:border-b-0">
+                                    <div v-for="(manifest, mIndex) in date.manifests" :key="manifest.id">
+                                        <span :class="{ 'hidden': mIndex > 0 }">
+                                            {{ formatDate(date.date) }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="p-3">
+                                <!-- Iterate over dates and manifests -->
+                                <div v-for="date in period.dates" :key="date.date" class="border-b border-gray-600 last:border-b-0">
+                                    <div v-for="manifest in date.manifests" :key="manifest.id">
+                                        {{ manifest.round_id }}
+                                    </div>
+                                </div>
+                            </td>
+                            <td v-for="type in parcelTypes" :key="type.id" class="p-3 relative group">
+                                <!-- Iterate over dates and manifests -->
+                                <div v-for="date in period.dates" :key="date.date" class="border-b border-gray-600 last:border-b-0">
+                                    <div v-for="manifest in date.manifests" :key="manifest.id">
+                                        <span class="cursor-pointer">
+                                            {{ manifest.quantities.find(q => q.parcel_type_id === type.id).total }}
+                                            <span class="absolute hidden group-hover:block bg-gray-600 text-white text-xs rounded py-1 px-2 -mt-8 left-1/2 transform -translate-x-1/2">
+                                                Value: £{{ manifest.quantities.find(q => q.parcel_type_id === type.id).value.toFixed(2) }}
+                                            </span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="p-3">
+                                <!-- Iterate over dates and manifests -->
+                                <div v-for="date in period.dates" :key="date.date" class="border-b border-gray-600 last:border-b-0">
+                                    <div v-for="manifest in date.manifests" :key="manifest.id">
+                                        £{{ manifest.total_value.toFixed(2) }}
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="p-3">
+                                <!-- Iterate over dates and manifests -->
+                                <div v-for="date in period.dates" :key="date.date" class="border-b border-gray-600 last:border-b-0">
+                                    <div v-for="manifest in date.manifests" :key="manifest.id" class="flex gap-1">
+                                        <button
+                                            @click="editManifest(manifest.id)"
+                                            class="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold px-2 py-0.5 rounded-md text-xs"
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            @click="deleteManifest(manifest.id, manifest.delivery_date)"
+                                            class="bg-red-600 hover:bg-red-700 text-white font-semibold px-2 py-0.5 rounded-md text-xs"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                     </tbody>
@@ -369,3 +420,15 @@ function formatDate(dateStr: string): string {
         </div>
     </AppLayout>
 </template>
+
+<style scoped>
+/* Optional: Adjust tooltip positioning if needed */
+.group:hover .group-hover\:block {
+    z-index: 10;
+}
+
+/* Ensure table cells are aligned */
+td {
+    vertical-align: top;
+}
+</style>

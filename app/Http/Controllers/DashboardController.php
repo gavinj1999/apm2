@@ -2,6 +2,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Manifest;
+use App\Models\Period;
 use App\Models\Round;
 use App\Models\ParcelType;
 use Inertia\Inertia;
@@ -16,6 +17,9 @@ class DashboardController extends Controller
         // Fetch rounds
         $rounds = Round::all();
 
+        // Fetch all periods
+        $periods = Period::all();
+
         // Fetch individual manifests with their rounds and summaries
         $manifests = Manifest::with(['round', 'summaries.parcel_type'])
             ->where('user_id', auth()->id())
@@ -25,13 +29,19 @@ class DashboardController extends Controller
                 // Aggregate quantities for each parcel type
                 $quantities = $parcelTypes->map(function ($type) use ($manifest) {
                     $summary = $manifest->summaries->firstWhere('parcel_type_id', $type->id);
+                    $pricing = $manifest->round->pricings->firstWhere('parcel_type_id', $type->id);
+                    $price = $pricing ? $pricing->price : 0;
+                    $manifested = $summary ? $summary->manifested : 0;
+                    $value = $price * $manifested;
+
                     return [
                         'parcel_type_id' => $type->id,
                         'name' => $type->name,
-                        'manifested' => $summary ? $summary->manifested : 0,
+                        'manifested' => $manifested,
                         're_manifested' => $summary ? $summary->re_manifested : 0,
                         'carried_forward' => $summary ? $summary->carried_forward : 0,
                         'total' => $summary ? ($summary->manifested + $summary->re_manifested + $summary->carried_forward) : 0,
+                        'value' => $value, // Add the calculated value (price × manifested)
                     ];
                 });
 
@@ -51,6 +61,37 @@ class DashboardController extends Controller
                 ];
             });
 
+        // Group manifests by period, then by date, then by round
+        $groupedManifests = $periods->map(function ($period) use ($manifests) {
+            $periodManifests = $manifests->filter(function ($manifest) use ($period) {
+                $deliveryDate = \Carbon\Carbon::parse($manifest['delivery_date']);
+                return $deliveryDate->between($period->start_date, $period->end_date);
+            });
+
+            // Skip this period if there are no manifests
+            if ($periodManifests->isEmpty()) {
+                return null;
+            }
+
+            // Group by date
+            $byDate = $periodManifests->groupBy('delivery_date')->map(function ($dateManifests) {
+                // Group by round within each date
+                $byRound = $dateManifests->groupBy('round_id')->map(function ($roundManifests) {
+                    return $roundManifests->first();
+                })->values();
+
+                return [
+                    'date' => $dateManifests->first()['delivery_date'],
+                    'manifests' => $byRound,
+                ];
+            })->values();
+
+            return [
+                'period_name' => $period->name,
+                'dates' => $byDate,
+            ];
+        })->filter()->values(); // Filter out null values (periods with no manifests)
+
         // Calculate total earnings across all manifests
         $totalEarnings = Manifest::with(['round.pricings', 'summaries'])
             ->where('user_id', auth()->id())
@@ -64,7 +105,7 @@ class DashboardController extends Controller
             });
 
         return Inertia::render('Dashboard', [
-            'manifests' => $manifests, // Changed from groupedManifests
+            'groupedManifests' => $groupedManifests,
             'totalEarnings' => $totalEarnings,
             'rounds' => $rounds,
             'parcelTypes' => $parcelTypes,
