@@ -10,11 +10,10 @@ class ManifestItem extends Model
     /** @use HasFactory<\Database\Factories\ManifestItemFactory> */
     use HasFactory;
 
-    protected $fillable = ['manifest_id', 'parcel_type', 'manifested', 're_manifested', 'carried_forward'];
-
-    public function manifest()
+    public function parcelType()
     {
-        return $this->belongsTo(Manifest::class);
+        return $this->belongsTo(ParcelType::class);
     }
+    protected $fillable = ['manifest_id', 'tracking_number', 'recipient_name', 'delivery_address', 'status', 'parcel_type_id'];
 
 }

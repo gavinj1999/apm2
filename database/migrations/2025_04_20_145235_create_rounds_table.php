@@ -11,12 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('manifests', function (Blueprint $table) {
+        Schema::create('rounds', function (Blueprint $table) {
             $table->id();
-            $table->string('manifest_number')->unique();
-            $table->date('delivery_date');
-            $table->string('status')->default('pending');
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->string('round_id')->unique(); // e.g., "596434"
+            $table->string('name')->nullable(); // e.g., "North Route"
             $table->timestamps();
         });
     }
@@ -26,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('manifests');
+        Schema::dropIfExists('rounds');
     }
 };

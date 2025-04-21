@@ -1,86 +1,133 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use App\Models\Manifest;
-use App\Models\ManifestItem;
+use App\Models\ManifestSummary;
+use App\Models\ParcelType;
+use App\Models\Round;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
 
 class ManifestController extends Controller
 {
     public function store(Request $request)
     {
+        $validated = $request->validate([
+            'manifest_number' => 'required|string|unique:manifests|max:255',
+            'delivery_date' => 'required|date',
+            'status' => 'required|in:pending,in-progress,completed',
+            'round_id' => 'required|exists:rounds,id',
+            'quantities' => 'required|array',
+            'quantities.*.parcel_type_id' => 'required|exists:parcel_types,id',
+            'quantities.*.manifested' => 'required|integer|min:0',
+            'quantities.*.re_manifested' => 'required|integer|min:0',
+            'quantities.*.carried_forward' => 'required|integer|min:0',
+        ]);
 
-        try {
-            // Validate the request
-            $validated = $request->validate([
-                'manifest_date' => 'required|string',
-                'parsed_manifest_date' => 'required|date_format:Y-m-d',
-                'manifest' => 'required|string',
-                'round' => 'required|string',
-                'Manifested' => 'required|array',
-                'Manifested.*.parcel_type' => 'required|string',
-                'Manifested.*.manifested' => 'required|integer',
-                'Re-manifested' => 'required|array',
-                'Re-manifested.*.parcel_type' => 'required|string',
-                'Re-manifested.*.manifested' => 'required|integer',
-                'Carried forward' => 'required|array',
-                'Carried forward.*.parcel_type' => 'required|string',
-                'Carried forward.*.manifested' => 'required|integer',
+        $manifest = Manifest::create([
+            'manifest_number' => $validated['manifest_number'],
+            'delivery_date' => $validated['delivery_date'],
+            'status' => $validated['status'],
+            'user_id' => auth()->id(),
+            'round_id' => $validated['round_id']
+        ]);
+
+        foreach ($validated['quantities'] as $quantity) {
+            ManifestSummary::create([
+                'manifest_id' => $manifest->id,
+                'parcel_type_id' => $quantity['parcel_type_id'],
+                'manifested' => $quantity['manifested'],
+                're_manifested' => $quantity['re_manifested'],
+                'carried_forward' => $quantity['carried_forward']
             ]);
-
-            // Check for duplicate manifest
-            if (Manifest::where('manifest', $validated['manifest'])->exists()) {
-                return response()->json([
-                    'message' => 'Manifest already exists',
-                    'manifest' => $validated['manifest'],
-                ], 409);
-            }
-
-            // Start a transaction
-            return DB::transaction(function () use ($validated) {
-                // Create the manifest
-                $manifest = Manifest::create([
-                    'manifest_date' => $validated['manifest_date'],
-                    'parsed_manifest_date' => $validated['parsed_manifest_date'],
-                    'manifest' => $validated['manifest'],
-                    'round' => $validated['round'],
-                ]);
-
-                // Create manifest items
-                $items = [];
-                foreach ($validated['Manifested'] as $index => $manifested) {
-                    $items[] = [
-                        'manifest_id' => $manifest->id,
-                        'parcel_type' => $manifested['parcel_type'],
-                        'manifested' => $manifested['manifested'],
-                        're_manifested' => $validated['Re-manifested'][$index]['manifested'],
-                        'carried_forward' => $validated['Carried forward'][$index]['manifested'],
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
-                }
-                ManifestItem::insert($items);
-
-                return response()->json([
-                    'message' => 'Manifest data stored successfully',
-                    'manifest' => $manifest->load('items'),
-                ], 201);
-            });
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error('Validation failed: ' . json_encode($e->errors()));
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $e->errors(),
-            ], 422);
-        } catch (\Exception $e) {
-            Log::error('Failed to store manifest: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'Failed to store manifest',
-                'error' => $e->getMessage(),
-            ], 500);
         }
+
+        return redirect()->route('dashboard')->with('success', 'Manifest created successfully!');
+    }
+
+    public function getById($id)
+    {
+        $manifest = Manifest::with(['summaries', 'round'])
+            ->where('id', $id)
+            ->where('user_id', auth()->id())
+            ->first();
+
+        if (!$manifest) {
+            return response()->json(['error' => 'Manifest not found'], 404);
+        }
+
+        $quantities = $manifest->summaries->map(function ($summary) {
+            return [
+                'parcel_type_id' => $summary->parcel_type_id,
+                'manifested' => $summary->manifested,
+                're_manifested' => $summary->re_manifested,
+                'carried_forward' => $summary->carried_forward,
+            ];
+        });
+
+        return response()->json([
+            'delivery_date' => $manifest->delivery_date,
+            'status' => $manifest->status,
+            'round_id' => $manifest->round_id,
+            'quantities' => $quantities,
+        ]);
+    }
+
+    public function updateById(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'delivery_date' => 'required|date',
+            'status' => 'required|in:pending,in-progress,completed',
+            'round_id' => 'required|exists:rounds,id',
+            'quantities' => 'required|array',
+            'quantities.*.parcel_type_id' => 'required|exists:parcel_types,id',
+            'quantities.*.manifested' => 'required|integer|min:0',
+            'quantities.*.re_manifested' => 'required|integer|min:0',
+            'quantities.*.carried_forward' => 'required|integer|min:0',
+        ]);
+
+        $manifest = Manifest::where('id', $id)
+            ->where('user_id', auth()->id())
+            ->first();
+
+        if (!$manifest) {
+            return redirect()->route('dashboard')->with('error', 'Manifest not found.');
+        }
+
+        $manifest->update([
+            'delivery_date' => $validated['delivery_date'],
+            'status' => $validated['status'],
+            'round_id' => $validated['round_id'],
+        ]);
+
+        // Delete existing summaries and recreate them
+        $manifest->summaries()->delete();
+        foreach ($validated['quantities'] as $quantity) {
+            ManifestSummary::create([
+                'manifest_id' => $manifest->id,
+                'parcel_type_id' => $quantity['parcel_type_id'],
+                'manifested' => $quantity['manifested'],
+                're_manifested' => $quantity['re_manifested'],
+                'carried_forward' => $quantity['carried_forward'],
+            ]);
+        }
+
+        return redirect()->route('dashboard')->with('success', 'Manifest updated successfully!');
+    }
+
+    public function deleteById($id)
+    {
+        $manifest = Manifest::where('id', $id)
+            ->where('user_id', auth()->id())
+            ->first();
+
+        if (!$manifest) {
+            return redirect()->route('dashboard')->with('error', 'Manifest not found.');
+        }
+
+        $manifest->summaries()->delete();
+        $manifest->delete();
+
+        return redirect()->route('dashboard')->with('success', 'Manifest deleted successfully!');
     }
 }

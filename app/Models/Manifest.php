@@ -2,18 +2,24 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Manifest extends Model
 {
-    /** @use HasFactory<\Database\Factories\ManifestFactory> */
-    use HasFactory;
+    protected $fillable = ['manifest_number', 'delivery_date', 'status', 'user_id', 'round_id'];
 
-    protected $fillable = ['manifest_date', 'parsed_manifest_date', 'manifest', 'round'];
-
-    public function items()
+    public function round()
     {
-        return $this->hasMany(ManifestItem::class);
+        return $this->belongsTo(Round::class);
+    }
+
+    public function summaries()
+    {
+        return $this->hasMany(ManifestSummary::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }
