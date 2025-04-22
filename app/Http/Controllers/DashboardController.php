@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\Manifest;
@@ -14,8 +15,8 @@ class DashboardController extends Controller
         // Fetch all parcel types
         $parcelTypes = ParcelType::all();
 
-        // Fetch rounds
-        $rounds = Round::all();
+        // Fetch rounds for the authenticated user
+        $rounds = Round::where('user_id', auth()->id())->get();
 
         // Fetch all periods
         $periods = Period::all();
@@ -26,11 +27,29 @@ class DashboardController extends Controller
             ->orderBy('delivery_date', 'desc')
             ->get()
             ->map(function ($manifest) use ($parcelTypes) {
+                // Debug: Log manifest and round data
+                \Log::info('Manifest data:', [
+                    'manifest_id' => $manifest->id,
+                    'round_id' => $manifest->round_id,
+                    'round_exists' => !is_null($manifest->round),
+                ]);
+
+                if (is_null($manifest->round)) {
+                    // Skip this manifest if the round is missing
+                    return null;
+                }
+
                 // Aggregate quantities for each parcel type
                 $quantities = $parcelTypes->map(function ($type) use ($manifest) {
                     $summary = $manifest->summaries->firstWhere('parcel_type_id', $type->id);
-                    $pricing = $manifest->round->pricings->firstWhere('parcel_type_id', $type->id);
-                    $price = $pricing ? $pricing->price : 0;
+                    // Debug: Log roundPricings data
+                    \Log::info('RoundPricings data for manifest:', [
+                        'manifest_id' => $manifest->id,
+                        'round_id' => $manifest->round->id,
+                        'roundPricings' => $manifest->round->roundPricings ? $manifest->round->roundPricings->toArray() : null,
+                    ]);
+                    $roundPricing = $manifest->round->roundPricings ? $manifest->round->roundPricings->firstWhere('parcel_type_id', $type->id) : null;
+                    $price = $roundPricing ? $roundPricing->price : 0;
                     $manifested = $summary ? $summary->manifested : 0;
                     $value = $price * $manifested;
 
@@ -41,14 +60,14 @@ class DashboardController extends Controller
                         're_manifested' => $summary ? $summary->re_manifested : 0,
                         'carried_forward' => $summary ? $summary->carried_forward : 0,
                         'total' => $summary ? ($summary->manifested + $summary->re_manifested + $summary->carried_forward) : 0,
-                        'value' => $value, // Add the calculated value (price × manifested)
+                        'value' => $value,
                     ];
                 });
 
                 // Calculate total monetary value for the manifest
                 $totalValue = $manifest->summaries->reduce(function ($total, $summary) use ($manifest) {
-                    $pricing = $manifest->round->pricings->firstWhere('parcel_type_id', $summary->parcel_type_id);
-                    $price = $pricing ? $pricing->price : 0;
+                    $roundPricing = $manifest->round->roundPricings ? $manifest->round->roundPricings->firstWhere('parcel_type_id', $summary->parcel_type_id) : null;
+                    $price = $roundPricing ? $roundPricing->price : 0;
                     return $total + ($price * $summary->manifested);
                 }, 0);
 
@@ -59,7 +78,8 @@ class DashboardController extends Controller
                     'quantities' => $quantities,
                     'total_value' => $totalValue,
                 ];
-            });
+            })
+            ->filter(); // Remove null values (manifests with missing rounds)
 
         // Group manifests by period, then by date, then by round
         $groupedManifests = $periods->map(function ($period) use ($manifests) {
@@ -90,16 +110,27 @@ class DashboardController extends Controller
                 'period_name' => $period->name,
                 'dates' => $byDate,
             ];
-        })->filter()->values(); // Filter out null values (periods with no manifests)
+        })->filter()->values();
 
         // Calculate total earnings across all manifests
-        $totalEarnings = Manifest::with(['round.pricings', 'summaries'])
+        $totalEarnings = Manifest::with(['round.roundPricings', 'summaries'])
             ->where('user_id', auth()->id())
             ->get()
             ->sum(function ($manifest) {
+                // Debug: Log manifest and round data for total earnings
+                \Log::info('Total earnings manifest data:', [
+                    'manifest_id' => $manifest->id,
+                    'round_id' => $manifest->round_id,
+                    'round_exists' => !is_null($manifest->round),
+                ]);
+
+                if (is_null($manifest->round)) {
+                    return 0; // Skip this manifest if the round is missing
+                }
+
                 return $manifest->summaries->reduce(function ($total, $summary) use ($manifest) {
-                    $pricing = $manifest->round->pricings->firstWhere('parcel_type_id', $summary->parcel_type_id);
-                    $price = $pricing ? $pricing->price : 0;
+                    $roundPricing = $manifest->round->roundPricings ? $manifest->round->roundPricings->firstWhere('parcel_type_id', $summary->parcel_type_id) : null;
+                    $price = $roundPricing ? $roundPricing->price : 0;
                     return $total + ($price * $summary->manifested);
                 }, 0);
             });

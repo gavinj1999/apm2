@@ -5,6 +5,7 @@ use App\Http\Controllers\PeriodController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ManifestController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\RoundPricingController;
 use Inertia\Inertia;
 
 Route::get('/', function () {
@@ -19,11 +20,18 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
-    Route::post('/manifests', [ManifestController::class, 'store'])->name('manifests.store');
-    Route::get('/manifests/{id}', [ManifestController::class, 'getById'])->name('manifests.get-by-id'); // New: Fetch manifest by ID
-    Route::put('/manifests/{id}', [ManifestController::class, 'updateById'])->name('manifests.update-by-id'); // New: Update manifest by ID
-    Route::delete('/manifests/{id}', [ManifestController::class, 'deleteById'])->name('manifests.delete-by-id'); // New: Delete manifest by ID
+
+
+    Route::get('/dashboard', [ManifestController::class, 'index'])->middleware('auth')->name('dashboard');
+    Route::post('/manifests', [ManifestController::class, 'store'])->middleware('auth')->name('manifests.store');
+    Route::get('/manifests/{id}', [ManifestController::class, 'show'])->middleware('auth')->name('manifests.show');
+    Route::put('/manifests/{id}', [ManifestController::class, 'update'])->middleware('auth')->name('manifests.update-by-id');
+    Route::delete('/manifests/{id}', [ManifestController::class, 'destroy'])->middleware('auth')->name('manifests.destroy');
+
+    Route::get('/prices', [RoundPricingController::class, 'index'])->name('prices.index');
+    Route::post('/prices', [RoundPricingController::class, 'store'])->name('prices.store');
+    Route::put('/prices/{id}', [RoundPricingController::class, 'update'])->name('prices.update');
+    Route::delete('/prices/{id}', [RoundPricingController::class, 'destroy'])->name('prices.destroy');
 });
 
 Route::middleware(['auth'])->group(function () {

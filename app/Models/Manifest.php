@@ -22,4 +22,9 @@ class Manifest extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function quantities()
+    {
+        return $this->hasMany(ManifestSummary::class);
+    }
 }

@@ -17,6 +17,10 @@ const mainNavItems: NavItem[] = [
         title: 'Periods',
         href: '/periods',
         icon: LayoutGrid,
+    },    {
+        title: 'Rates',
+        href: '/prices',
+        icon: LayoutGrid,
     },
 ];
 

@@ -42,16 +42,14 @@ const { groupedManifests, totalEarnings, rounds, parcelTypes, flash } = definePr
     flash?: { success?: string; error?: string };
 }>();
 
-// Generate default manifest number in HHMMDDMMYYYY format
+// Debug: Log the groupedManifests data
+console.log('Grouped Manifests:', JSON.stringify(groupedManifests, null, 2));
+
+// Default delivery date (today)
 const now = new Date();
-const hours = String(now.getHours()).padStart(2, '0');
-const minutes = String(now.getMinutes()).padStart(2, '0');
 const day = String(now.getDate()).padStart(2, '0');
 const month = String(now.getMonth() + 1).padStart(2, '0');
 const year = now.getFullYear();
-const defaultManifestNumber = `${hours}${minutes}${day}${month}${year}`;
-
-// Default delivery date (today)
 const defaultDeliveryDate = `${year}-${month}-${day}`;
 
 // State for edit mode
@@ -60,7 +58,6 @@ const editingManifestId = ref<number | null>(null);
 
 // Form for creating/updating a manifest
 const manifestForm = useForm({
-    manifest_number: defaultManifestNumber,
     delivery_date: defaultDeliveryDate,
     status: 'pending',
     round_id: '',
@@ -72,12 +69,43 @@ const manifestForm = useForm({
     })),
 });
 
+// Flatten groupedManifests into a list of rows for rendering
+const flattenedRows = computed(() => {
+    const rows = [];
+    groupedManifests.forEach((period, pIndex) => {
+        period.dates.forEach((date, dIndex) => {
+            date.manifests.forEach((manifest, mIndex) => {
+                rows.push({
+                    period: period.period_name,
+                    date: date.date,
+                    manifest: manifest,
+                    isFirstInPeriod: dIndex === 0 && mIndex === 0,
+                    isFirstInDate: mIndex === 0,
+                    periodRowspan: period.dates.reduce((sum, d) => sum + d.manifests.length, 0),
+                    dateRowspan: date.manifests.length,
+                });
+            });
+        });
+    });
+    return rows;
+});
+
 // Submit function (handles both create and update)
 function submitManifest() {
     if (isEditMode.value && editingManifestId.value) {
-        manifestForm.put(route('manifests.update-by-id', editingManifestId.value));
+        manifestForm.put(route('manifests.update-by-id', editingManifestId.value), {
+            onSuccess: () => {
+                isEditMode.value = false;
+                editingManifestId.value = null;
+                manifestForm.reset();
+            },
+        });
     } else {
-        manifestForm.post(route('manifests.store'));
+        manifestForm.post(route('manifests.store'), {
+            onSuccess: () => {
+                manifestForm.reset();
+            },
+        });
     }
 }
 
@@ -88,10 +116,19 @@ function editManifest(id: number) {
             Accept: 'application/json',
         },
     })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.error) {
                 alert(data.error);
+                return;
+            }
+            if (!data.delivery_date || !data.status || !data.round_id) {
+                alert('Invalid manifest data received.');
                 return;
             }
             manifestForm.delivery_date = data.delivery_date;
@@ -113,11 +150,11 @@ function editManifest(id: number) {
             });
             isEditMode.value = true;
             editingManifestId.value = id;
-            window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         })
         .catch(error => {
             console.error('Error fetching manifest:', error);
-            alert('Failed to load manifest data.');
+            alert('Failed to load manifest data: ' + error.message);
         });
 }
 
@@ -126,13 +163,20 @@ function cancelEdit() {
     isEditMode.value = false;
     editingManifestId.value = null;
     manifestForm.reset();
-    manifestForm.manifest_number = defaultManifestNumber; // Reset manifest_number to default
 }
 
 // Function to delete a manifest
 function deleteManifest(id: number, date: string) {
     if (confirm(`Are you sure you want to delete the manifest for ${formatDate(date)}?`)) {
-        router.delete(route('manifests.delete-by-id', id));
+        router.delete(route('manifests.destroy', id), {
+            onSuccess: () => {
+                console.log('Manifest deleted successfully');
+            },
+            onError: (error) => {
+                console.error('Error deleting manifest:', error);
+                alert('Failed to delete manifest: ' + (error.message || 'Unknown error'));
+            }
+        });
     }
 }
 
@@ -178,16 +222,6 @@ function formatDate(dateStr: string): string {
             <div class="mb-8">
                 <h2 class="text-xl font-semibold mb-4">{{ isEditMode ? 'Edit Manifest' : 'Create New Manifest' }}</h2>
                 <form @submit.prevent="submitManifest" class="bg-gray-800 p-6 rounded-lg shadow-lg">
-                    <div v-if="!isEditMode" class="mb-5">
-                        <label class="block text-sm font-medium mb-2">Manifest Number</label>
-                        <input
-                            v-model="manifestForm.manifest_number"
-                            type="text"
-                            class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Enter manifest number"
-                        />
-                        <div v-if="manifestForm.errors.manifest_number" class="text-red-500 text-sm mt-1">{{ manifestForm.errors.manifest_number }}</div>
-                    </div>
                     <div class="mb-5">
                         <label class="block text-sm font-medium mb-2">Delivery Date</label>
                         <input
@@ -351,67 +385,46 @@ function formatDate(dateStr: string): string {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="(period, pIndex) in groupedManifests" :key="period.period_name" class="border-b border-gray-600">
-                            <td class="p-3 font-semibold" :class="{ 'border-t border-gray-600': pIndex > 0 }">
-                                {{ period.period_name }}
+                        <tr v-for="(row, index) in flattenedRows" :key="row.manifest.id" class="border-b border-gray-600">
+                            <!-- Period (only shown on the first row of the period) -->
+                            <td v-if="row.isFirstInPeriod" :rowspan="row.periodRowspan" class="p-3 font-semibold">
+                                {{ row.period }}
                             </td>
+                            <!-- Date (only shown on the first manifest of the date) -->
+                            <td v-if="row.isFirstInDate" :rowspan="row.dateRowspan" class="p-3">
+                                {{ formatDate(row.date) }}
+                            </td>
+                            <!-- Round -->
                             <td class="p-3">
-                                <!-- Iterate over dates -->
-                                <div v-for="(date, dIndex) in period.dates" :key="date.date" class="border-b border-gray-600 last:border-b-0">
-                                    <div v-for="(manifest, mIndex) in date.manifests" :key="manifest.id">
-                                        <span :class="{ 'hidden': mIndex > 0 }">
-                                            {{ formatDate(date.date) }}
-                                        </span>
-                                    </div>
-                                </div>
+                                {{ row.manifest.round_id }}
                             </td>
-                            <td class="p-3">
-                                <!-- Iterate over dates and manifests -->
-                                <div v-for="date in period.dates" :key="date.date" class="border-b border-gray-600 last:border-b-0">
-                                    <div v-for="manifest in date.manifests" :key="manifest.id">
-                                        {{ manifest.round_id }}
-                                    </div>
-                                </div>
-                            </td>
+                            <!-- Parcel Types -->
                             <td v-for="type in parcelTypes" :key="type.id" class="p-3 relative group">
-                                <!-- Iterate over dates and manifests -->
-                                <div v-for="date in period.dates" :key="date.date" class="border-b border-gray-600 last:border-b-0">
-                                    <div v-for="manifest in date.manifests" :key="manifest.id">
-                                        <span class="cursor-pointer">
-                                            {{ manifest.quantities.find(q => q.parcel_type_id === type.id).total }}
-                                            <span class="absolute hidden group-hover:block bg-gray-600 text-white text-xs rounded py-1 px-2 -mt-8 left-1/2 transform -translate-x-1/2">
-                                                Value: £{{ manifest.quantities.find(q => q.parcel_type_id === type.id).value.toFixed(2) }}
-                                            </span>
-                                        </span>
-                                    </div>
-                                </div>
+                                <span class="cursor-pointer">
+                                    {{ row.manifest.quantities.find(q => q.parcel_type_id === type.id).total }}
+                                    <span class="absolute hidden group-hover:block bg-gray-600 text-white text-xs rounded py-1 px-2 -mt-8 left-1/2 transform -translate-x-1/2">
+                                        Value: £{{ row.manifest.quantities.find(q => q.parcel_type_id === type.id).value.toFixed(2) }}
+                                    </span>
+                                </span>
                             </td>
+                            <!-- Total Value -->
                             <td class="p-3">
-                                <!-- Iterate over dates and manifests -->
-                                <div v-for="date in period.dates" :key="date.date" class="border-b border-gray-600 last:border-b-0">
-                                    <div v-for="manifest in date.manifests" :key="manifest.id">
-                                        £{{ manifest.total_value.toFixed(2) }}
-                                    </div>
-                                </div>
+                                £{{ row.manifest.total_value.toFixed(2) }}
                             </td>
-                            <td class="p-3">
-                                <!-- Iterate over dates and manifests -->
-                                <div v-for="date in period.dates" :key="date.date" class="border-b border-gray-600 last:border-b-0">
-                                    <div v-for="manifest in date.manifests" :key="manifest.id" class="flex gap-1">
-                                        <button
-                                            @click="editManifest(manifest.id)"
-                                            class="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold px-2 py-0.5 rounded-md text-xs"
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            @click="deleteManifest(manifest.id, manifest.delivery_date)"
-                                            class="bg-red-600 hover:bg-red-700 text-white font-semibold px-2 py-0.5 rounded-md text-xs"
-                                        >
-                                            Delete
-                                        </button>
-                                    </div>
-                                </div>
+                            <!-- Actions -->
+                            <td class="p-3 flex gap-1">
+                                <button
+                                    @click="editManifest(row.manifest.id)"
+                                    class="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold px-2 py-0.5 rounded-md text-xs"
+                                >
+                                    Edit
+                                </button>
+                                <button
+                                    @click="deleteManifest(row.manifest.id, row.manifest.delivery_date)"
+                                    class="bg-red-600 hover:bg-red-700 text-white font-semibold px-2 py-0.5 rounded-md text-xs"
+                                >
+                                    Delete
+                                </button>
                             </td>
                         </tr>
                     </tbody>
