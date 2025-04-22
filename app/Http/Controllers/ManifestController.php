@@ -7,6 +7,7 @@ use App\Models\Round;
 use App\Models\ParcelType;
 use App\Models\ManifestSummary; // Updated to use ManifestSummary
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -108,7 +109,7 @@ class ManifestController extends Controller
         ]);
     }
 
-    use Illuminate\Validation\Rule; // Add this import at the top
+     // Add this import at the top
 
 public function store(Request $request)
 {
