@@ -299,7 +299,7 @@ function formatDate(dateStr: string): string {
                                     <label class="block text-sm font-medium mb-2">{{ type.name }}</label>
                                     <div class="grid grid-cols-3 gap-2">
                                         <div>
-                                            <label class="block text-xs text-gray-400 mb-1">Manifested</label>
+                                            <label class="block text-xs text-gray-400 mb-1">M</label>
                                             <input
                                                 v-model.number="manifestForm.quantities.find(q => q.parcel_type_id === type.id).manifested"
                                                 type="number"
@@ -308,7 +308,7 @@ function formatDate(dateStr: string): string {
                                             />
                                         </div>
                                         <div>
-                                            <label class="block text-xs text-gray-400 mb-1">Re-manifested</label>
+                                            <label class="block text-xs text-gray-400 mb-1">R</label>
                                             <input
                                                 v-model.number="manifestForm.quantities.find(q => q.parcel_type_id === type.id).re_manifested"
                                                 type="number"
@@ -317,7 +317,7 @@ function formatDate(dateStr: string): string {
                                             />
                                         </div>
                                         <div>
-                                            <label class="block text-xs text-gray-400 mb-1">Carried Forward</label>
+                                            <label class="block text-xs text-gray-400 mb-1">CF</label>
                                             <input
                                                 v-model.number="manifestForm.quantities.find(q => q.parcel_type_id === type.id).carried_forward"
                                                 type="number"
@@ -336,13 +336,13 @@ function formatDate(dateStr: string): string {
                                     <label class="block text-sm font-bold">Total</label>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-bold">Manifested: {{ getTotals(manifestForm).manifested }}</label>
+                                    <label class="block text-sm font-bold">Man: {{ getTotals(manifestForm).manifested }}</label>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-bold">Re-manifested: {{ getTotals(manifestForm).re_manifested }}</label>
+                                    <label class="block text-sm font-bold">Re-man: {{ getTotals(manifestForm).re_manifested }}</label>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-bold">Carried Forward: {{ getTotals(manifestForm).carried_forward }}</label>
+                                    <label class="block text-sm font-bold">CF: {{ getTotals(manifestForm).carried_forward }}</label>
                                 </div>
                             </div>
                         </div>
