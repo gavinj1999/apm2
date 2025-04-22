@@ -31,7 +31,7 @@
       </form>
     </div>
   </template>
-  <script setup>
+  <script setup lang="ts">
   import { useForm } from '@inertiajs/vue3';
   defineProps(['rounds']);
   const form = useForm({

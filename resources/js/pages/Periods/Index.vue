@@ -109,8 +109,8 @@
     </AppLayout>
 </template>
 
-<script setup>
-import AppLayout from '@/Layouts/AppLayout.vue';
+<script setup lang="ts">
+import AppLayout from '@/layouts/AppLayout.vue';
 import DatePicker from '@/components/DatePicker.vue';
 import { useForm, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
