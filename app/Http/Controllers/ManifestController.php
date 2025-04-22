@@ -108,52 +108,63 @@ class ManifestController extends Controller
         ]);
     }
 
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'delivery_date' => 'required|date',
-            'status' => 'required|in:pending,in-progress,completed',
-            'round_id' => 'required|exists:rounds,id',
-            'quantities' => 'required|array',
-            'quantities.*.parcel_type_id' => 'required|exists:parcel_types,id',
-            'quantities.*.manifested' => 'required|integer|min:0',
-            'quantities.*.re_manifested' => 'required|integer|min:0',
-            'quantities.*.carried_forward' => 'required|integer|min:0',
+    use Illuminate\Validation\Rule; // Add this import at the top
+
+public function store(Request $request)
+{
+    // Preload parcel types for validation
+    $parcelTypes = ParcelType::pluck('id')->toArray();
+
+    // Validate the request
+    $validated = $request->validate([
+        'delivery_date' => 'required|date',
+        'status' => 'required|in:pending,in-progress,completed',
+        'round_id' => ['required', Rule::exists('rounds', 'id')->where(function ($query) {
+            $query->where('user_id', auth()->id());
+        })],
+        'quantities' => 'required|array',
+        'quantities.*.parcel_type_id' => ['required', 'integer', Rule::in($parcelTypes)],
+        'quantities.*.manifested' => 'required|integer|min:0',
+        'quantities.*.re_manifested' => 'required|integer|min:0',
+        'quantities.*.carried_forward' => 'required|integer|min:0',
+    ]);
+
+    DB::beginTransaction();
+    try {
+        // Create the manifest
+        $manifest = Manifest::create([
+            'delivery_date' => $validated['delivery_date'],
+            'status' => $validated['status'],
+            'round_id' => $validated['round_id'],
         ]);
 
-        $round = Round::where('id', $validated['round_id'])
-            ->where('user_id', auth()->id())
-            ->first();
+        // Prepare data for bulk insert
+        $quantityData = array_map(function ($quantity) use ($manifest) {
+            return [
+                'manifest_id' => $manifest->id,
+                'parcel_type_id' => $quantity['parcel_type_id'],
+                'manifested' => $quantity['manifested'],
+                're_manifested' => $quantity['re_manifested'],
+                'carried_forward' => $quantity['carried_forward'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }, $validated['quantities']);
 
-        if (!$round) {
-            return redirect()->route('dashboard')->with('error', 'Selected round does not belong to you.');
-        }
+        // Bulk insert quantities
+        ManifestSummary::insert($quantityData);
 
-        DB::beginTransaction();
-        try {
-            $manifest = Manifest::create([
-                'delivery_date' => $validated['delivery_date'],
-                'status' => $validated['status'],
-                'round_id' => $validated['round_id'],
-            ]);
-
-            foreach ($validated['quantities'] as $quantity) {
-                ManifestSummary::create([
-                    'manifest_id' => $manifest->id,
-                    'parcel_type_id' => $quantity['parcel_type_id'],
-                    'manifested' => $quantity['manifested'],
-                    're_manifested' => $quantity['re_manifested'],
-                    'carried_forward' => $quantity['carried_forward'],
-                ]);
-            }
-
-            DB::commit();
-            return redirect()->route('dashboard')->with('success', 'Manifest created successfully!');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return redirect()->route('dashboard')->with('error', 'Failed to create manifest: ' . $e->getMessage());
-        }
+        DB::commit();
+        return redirect()->route('dashboard')->with('success', 'Manifest created successfully!');
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Error creating manifest', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        return redirect()->route('dashboard')->with('error', 'Failed to create manifest: ' . $e->getMessage());
     }
+}
 
     public function show($id)
 {
