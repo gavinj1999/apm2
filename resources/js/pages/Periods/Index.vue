@@ -111,7 +111,7 @@
 
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue';
-import DatePicker from '@/Components/DatePicker.vue';
+import DatePicker from '@/components/DatePicker.vue';
 import { useForm, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import { PlusIcon, XMarkIcon, PencilIcon, TrashIcon, ExclamationCircleIcon } from '@heroicons/vue/24/outline';
