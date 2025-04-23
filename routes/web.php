@@ -6,6 +6,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ManifestController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\RoundPricingController;
+
 use Inertia\Inertia;
 
 Route::get('/', function () {
@@ -20,8 +21,6 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
-
-
     Route::get('/dashboard', [ManifestController::class, 'index'])->middleware('auth')->name('dashboard');
     Route::post('/manifests', [ManifestController::class, 'store'])->middleware('auth')->name('manifests.store');
     Route::get('/manifests/{id}', [ManifestController::class, 'show'])->middleware('auth')->name('manifests.show');
@@ -39,6 +38,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/manifests/create', [ManifestController::class, 'create'])->name('manifests.create');
     Route::post('/manifests', [ManifestController::class, 'store'])->name('manifests.store');
 });
+
 
 
 Route::middleware(['auth'])->get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

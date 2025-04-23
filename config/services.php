@@ -13,6 +13,12 @@ return [
     | a conventional file to locate the various service credentials.
     |
     */
+    'openweathermap' => [
+        'key' => env('OPENWEATHERMAP_API_KEY'),
+    ],
+    'tomtom' => [
+        'key' => env('TOMTOM_API_KEY'),
+    ],
 
     'postmark' => [
         'token' => env('POSTMARK_TOKEN'),
