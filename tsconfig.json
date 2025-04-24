@@ -38,7 +38,7 @@
             "ziggy-js": ["./vendor/tightenco/ziggy"]
         },
         // "rootDirs": [],                                   /* Allow multiple folders to be treated as one when resolving modules. */
-        // "typeRoots": [],                                  /* Specify multiple folders that act like './node_modules/@types'. */
+        "typeRoots": ["./resources/js/types", "./node_modules/@types"],                               /* Specify multiple folders that act like './node_modules/@types'. */
         "types": [
             "vite/client",
             "vue/tsx",
@@ -122,7 +122,8 @@
     "include": [
         "resources/js/**/*.ts",
         "resources/js/**/*.d.ts",
-        "resources/js/**/*.tsx", 
-        "resources/js/**/*.vue"
+        "resources/js/**/*.tsx",
+        "resources/js/**/*.vue",
+        "inertia.d.ts"
     ]
 }
