@@ -5,246 +5,373 @@ namespace App\Http\Controllers;
 use App\Models\Manifest;
 use App\Models\Round;
 use App\Models\ParcelType;
-use App\Models\ManifestSummary; // Updated to use ManifestSummary
+use App\Models\ManifestSummary;
+use App\Models\Period;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class ManifestController extends Controller
 {
     public function index()
     {
-        $user = auth()->user();
-        $rounds = Round::where('user_id', $user->id)->get();
-        $roundIds = $rounds->pluck('id')->toArray(); // Get valid round IDs
-        $parcelTypes = ParcelType::all();
+        try {
+            $user = auth()->user();
+            Log::info('User authenticated', ['user_id' => $user->id]);
 
-        // Fetch manifests with their quantities, only for valid round IDs
-        $manifests = Manifest::whereIn('round_id', $roundIds)
-            ->with(['round', 'quantities'])
-            ->get();
+            $rounds = Round::where('user_id', $user->id)->get();
+            $roundIds = $rounds->pluck('id')->toArray();
+            Log::info('User rounds fetched', ['user_id' => $user->id, 'round_ids' => $roundIds]);
 
-        // Group manifests by period, then by date, and then by round
-        $groupedManifests = $manifests->groupBy(function ($manifest) {
-            return date('F Y', strtotime($manifest->delivery_date)); // e.g., "April 2025"
-        })->map(function ($group, $periodName) use ($rounds, $parcelTypes) {
-            // Group by date
-            $byDate = $group->groupBy('delivery_date')->map(function ($dateGroup, $date) use ($rounds, $parcelTypes) {
-                // Group by round within each date
-                $byRound = $dateGroup->groupBy('round_id')->map(function ($roundGroup, $roundId) use ($rounds, $parcelTypes, $date) {
-                    // Aggregate quantities for all manifests in this round on this date
-                    $quantities = $parcelTypes->map(function ($type) use ($roundGroup) {
-                        $totalManifested = $roundGroup->sum(function ($manifest) use ($type) {
-                            return $manifest->quantities->where('parcel_type_id', $type->id)->sum('manifested');
-                        });
-                        $totalReManifested = $roundGroup->sum(function ($manifest) use ($type) {
-                            return $manifest->quantities->where('parcel_type_id', $type->id)->sum('re_manifested');
-                        });
-                        $totalCarriedForward = $roundGroup->sum(function ($manifest) use ($type) {
-                            return $manifest->quantities->where('parcel_type_id', $type->id)->sum('carried_forward');
-                        });
-                        $total = $totalManifested + $totalReManifested + $totalCarriedForward;
+            if (empty($roundIds)) {
+                Log::warning('No rounds found for user', ['user_id' => $user->id]);
+            }
 
-                        // Calculate value based on the price for this round and parcel type
-                        $price = DB::table('round_pricings')
-                            ->where('round_id', $roundGroup->first()->round_id)
-                            ->where('parcel_type_id', $type->id)
-                            ->value('price') ?? 0;
+            $parcelTypes = ParcelType::all();
+
+            $manifests = Manifest::whereIn('round_id', $roundIds)
+                ->with(['round', 'quantities'])
+                ->get();
+
+            Log::info('Manifests fetched for user', [
+                'user_id' => $user->id,
+                'manifest_count' => $manifests->count(),
+                'manifest_round_ids' => $manifests->pluck('round_id')->unique()->toArray(),
+            ]);
+
+            $periods = Period::all();
+            Log::info('Periods fetched', ['period_count' => $periods->count()]);
+
+            $groupedManifests = $manifests->groupBy(function ($manifest) use ($periods) {
+                $manifestDate = Carbon::parse($manifest->delivery_date);
+                foreach ($periods as $period) {
+                    $startDate = Carbon::parse($period->start_date);
+                    $endDate = Carbon::parse($period->end_date);
+                    if ($manifestDate->between($startDate, $endDate)) {
+                        return $period->name;
+                    }
+                }
+                return 'Unassigned';
+            })->map(function ($group, $periodName) use ($rounds, $parcelTypes) {
+                $byDate = $group->groupBy('delivery_date')->map(function ($dateGroup, $date) use ($rounds, $parcelTypes) {
+                    $byRound = $dateGroup->groupBy('round_id')->map(function ($roundGroup, $roundId) use ($rounds, $parcelTypes, $date) {
+                        $quantities = $parcelTypes->map(function ($type) use ($roundGroup) {
+                            $totalManifested = 0;
+                            $totalReManifested = 0;
+                            $totalCarriedForward = 0;
+
+                            try {
+                                $totalManifested = $roundGroup->sum(function ($manifest) use ($type) {
+                                    return $manifest->quantities->where('parcel_type_id', $type->id)->sum('manifested') ?? 0;
+                                });
+                                $totalReManifested = $roundGroup->sum(function ($manifest) use ($type) {
+                                    return $manifest->quantities->where('parcel_type_id', $type->id)->sum('re_manifested') ?? 0;
+                                });
+                                $totalCarriedForward = $roundGroup->sum(function ($manifest) use ($type) {
+                                    return $manifest->quantities->where('parcel_type_id', $type->id)->sum('carried_forward') ?? 0;
+                                });
+                            } catch (\Exception $e) {
+                                Log::error('Error calculating quantities', [
+                                    'round_id' => $roundGroup->first()->round_id,
+                                    'parcel_type_id' => $type->id,
+                                    'error' => $e->getMessage(),
+                                ]);
+                            }
+
+                            $total = $totalManifested + $totalReManifested + $totalCarriedForward;
+
+                            $price = DB::table('round_pricings')
+                                ->where('round_id', $roundGroup->first()->round_id)
+                                ->where('parcel_type_id', $type->id)
+                                ->value('price') ?? 0;
+
+                            return [
+                                'parcel_type_id' => $type->id,
+                                'name' => $type->name,
+                                'manifested' => $totalManifested,
+                                're_manifested' => $totalReManifested,
+                                'carried_forward' => $totalCarriedForward,
+                                'total' => $total,
+                                'value' => $total * $price,
+                            ];
+                        });
+
+                        $totalValue = $quantities->sum('value');
 
                         return [
-                            'parcel_type_id' => $type->id,
-                            'name' => $type->name,
-                            'manifested' => $totalManifested,
-                            're_manifested' => $totalReManifested,
-                            'carried_forward' => $totalCarriedForward,
-                            'total' => $total,
-                            'value' => $total * $price,
+                            'id' => $roundGroup->first()->id,
+                            'manifest_number' => $roundGroup->first()->manifest_number,
+                            'delivery_date' => $date,
+                            'round_id' => $roundId, // Use the round_id from the manifests table directly
+                            'quantities' => $quantities,
+                            'total_value' => $totalValue,
                         ];
-                    });
-
-                    $totalValue = $quantities->sum('value');
-                    $round = $rounds->firstWhere('id', $roundId);
+                    })->values();
 
                     return [
-                        'id' => $roundGroup->first()->id, // Use the first manifest ID for edit/delete actions
-                        'delivery_date' => $date,
-                        'round_id' => $round ? $round->round_id : 'Unknown',
-                        'quantities' => $quantities,
-                        'total_value' => $totalValue,
+                        'date' => $date,
+                        'manifests' => $byRound,
                     ];
-                })->values();
+                })->sortByDesc('date')->values();
 
                 return [
-                    'date' => $date,
-                    'manifests' => $byRound,
+                    'period_name' => $periodName,
+                    'dates' => $byDate,
                 ];
-            })->sortByDesc('date')->values();
+            })->sortByDesc('period_name')->values();
 
-            return [
-                'period_name' => $periodName,
-                'dates' => $byDate,
-            ];
-        })->sortByDesc('period_name')->values();
+            $currentDate = Carbon::today();
+            Log::info('Current date', ['current_date' => $currentDate->toDateString()]);
 
-        $totalEarnings = $manifests->sum(function ($manifest) {
-            $quantities = $manifest->quantities->map(function ($quantity) use ($manifest) {
-                $price = DB::table('round_pricings')
-                    ->where('round_id', $manifest->round_id)
-                    ->where('parcel_type_id', $quantity->parcel_type_id)
-                    ->value('price') ?? 0;
-                $total = $quantity->manifested + $quantity->re_manifested + $quantity->carried_forward;
-                return $total * $price;
+            $currentPeriod = null;
+            foreach ($periods as $period) {
+                $startDate = Carbon::parse($period->start_date);
+                $endDate = Carbon::parse($period->end_date);
+                if ($currentDate->between($startDate, $endDate)) {
+                    $currentPeriod = $period;
+                    break;
+                }
+            }
+
+            if (!$currentPeriod) {
+                Log::warning('No current period found for today', ['current_date' => $currentDate->toDateString()]);
+                $currentPeriodName = 'Unknown Period';
+                $currentPeriodStart = $currentDate;
+                $currentPeriodEnd = $currentDate;
+            } else {
+                $currentPeriodName = $currentPeriod->name;
+                $currentPeriodStart = Carbon::parse($currentPeriod->start_date);
+                $currentPeriodEnd = Carbon::parse($currentPeriod->end_date);
+                Log::info('Current period calculated', [
+                    'current_period' => $currentPeriodName,
+                    'start_date' => $currentPeriodStart->toDateString(),
+                    'end_date' => $currentPeriodEnd->toDateString(),
+                ]);
+            }
+
+            $currentPeriodManifests = $manifests->filter(function ($manifest) use ($currentPeriodStart, $currentPeriodEnd) {
+                $manifestDate = Carbon::parse($manifest->delivery_date);
+                return $manifestDate->between($currentPeriodStart, $currentPeriodEnd);
             });
-            return $quantities->sum();
+
+            Log::info('Current period manifests', [
+                'count' => $currentPeriodManifests->count(),
+                'manifest_round_ids' => $currentPeriodManifests->pluck('round_id')->unique()->toArray(),
+            ]);
+
+            $currentPeriodEarnings = (float) $currentPeriodManifests->sum(function ($manifest) {
+                $quantitiesTotal = 0;
+                try {
+                    $quantitiesTotal = $manifest->quantities->sum(function ($quantity) use ($manifest) {
+                        $price = DB::table('round_pricings')
+                            ->where('round_id', $manifest->round_id)
+                            ->where('parcel_type_id', $quantity->parcel_type_id)
+                            ->value('price') ?? 0;
+                        $quantityTotal = $quantity->manifested + $quantity->re_manifested + $quantity->carried_forward;
+                        $value = $quantityTotal * $price;
+                        Log::info('Calculating quantity value for manifest', [
+                            'manifest_id' => $manifest->id,
+                            'round_id' => $manifest->round_id,
+                            'parcel_type_id' => $quantity->parcel_type_id,
+                            'quantity_total' => $quantityTotal,
+                            'price' => $price,
+                            'value' => $value,
+                        ]);
+                        return $value;
+                    });
+                    Log::info('Total earnings for manifest', [
+                        'manifest_id' => $manifest->id,
+                        'quantities_total' => $quantitiesTotal,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('Error calculating total earnings for manifest', [
+                        'manifest_id' => $manifest->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+                return $quantitiesTotal;
+            });
+
+            $daysWithManifests = $currentPeriodManifests->groupBy('delivery_date')->count();
+            $averageDailyIncome = $daysWithManifests > 0 ? (float) ($currentPeriodEarnings / $daysWithManifests) : 0.0;
+
+            $remainingDays = $currentDate->diffInDays($currentPeriodEnd);
+
+            Log::info('Dashboard metrics calculated', [
+                'currentPeriod' => $currentPeriodName,
+                'currentPeriodEarnings' => $currentPeriodEarnings,
+                'averageDailyIncome' => $averageDailyIncome,
+                'remainingDays' => $remainingDays,
+            ]);
+
+            return Inertia::render('Dashboard', [
+                'groupedManifests' => $groupedManifests,
+                'currentPeriodEarnings' => $currentPeriodEarnings,
+                'averageDailyIncome' => $averageDailyIncome,
+                'remainingDays' => $remainingDays,
+                'currentPeriod' => $currentPeriodName,
+                'rounds' => $rounds,
+                'parcelTypes' => $parcelTypes,
+                'flash' => session('flash', []),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in index method', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return redirect()->route('dashboard')->with('error', 'An error occurred while loading the dashboard.');
+        }
+    }
+
+    public function store(Request $request)
+    {
+        Log::info('Storing new manifest', ['user_id' => auth()->id()]);
+
+        $parcelTypes = Cache::remember('parcel_types_ids', 60 * 60 * 24, function () {
+            return ParcelType::pluck('id')->toArray();
         });
 
-        return Inertia::render('Dashboard', [
-            'groupedManifests' => $groupedManifests,
-            'totalEarnings' => $totalEarnings,
-            'rounds' => $rounds,
-            'parcelTypes' => $parcelTypes,
-            'flash' => session('flash', []),
+        $validated = $request->validate([
+            'delivery_date' => 'required|date',
+            'status' => 'required|in:pending,in-progress,completed',
+            'round_id' => ['required', Rule::exists('rounds', 'id')->where(function ($query) {
+                $query->where('user_id', auth()->id());
+            })],
+            'quantities' => 'required|array',
+            'quantities.*.parcel_type_id' => ['required', 'integer', Rule::in($parcelTypes)],
+            'quantities.*.manifested' => 'required|integer|min:0',
+            'quantities.*.re_manifested' => 'required|integer|min:0',
+            'quantities.*.carried_forward' => 'required|integer|min:0',
         ]);
+
+        DB::beginTransaction();
+        try {
+            $manifestNumber = 'MAN-' . now()->format('Ymd') . '-' . Str::random(8);
+            Log::info('Generating manifest number', ['manifest_number' => $manifestNumber]);
+
+            $manifest = Manifest::create([
+                'manifest_number' => $manifestNumber,
+                'delivery_date' => $validated['delivery_date'],
+                'status' => $validated['status'],
+                'round_id' => $validated['round_id'],
+            ]);
+
+            $quantityData = array_map(function ($quantity) use ($manifest) {
+                return [
+                    'manifest_id' => $manifest->id,
+                    'parcel_type_id' => $quantity['parcel_type_id'],
+                    'manifested' => $quantity['manifested'],
+                    're_manifested' => $quantity['re_manifested'],
+                    'carried_forward' => $quantity['carried_forward'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }, $validated['quantities']);
+
+            ManifestSummary::insert($quantityData);
+
+            DB::commit();
+            Log::info('Manifest created successfully', ['manifest_id' => $manifest->id]);
+
+            return redirect()->route('dashboard')->with('success', 'Manifest created successfully!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error creating manifest', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return redirect()->route('dashboard')->with('error', 'Failed to create manifest: ' . $e->getMessage());
+        }
     }
-
-     // Add this import at the top
-
-public function store(Request $request)
-{
-    // Preload parcel types for validation
-    $parcelTypes = ParcelType::pluck('id')->toArray();
-
-    // Validate the request
-    $validated = $request->validate([
-        'delivery_date' => 'required|date',
-        'status' => 'required|in:pending,in-progress,completed',
-        'round_id' => ['required', Rule::exists('rounds', 'id')->where(function ($query) {
-            $query->where('user_id', auth()->id());
-        })],
-        'quantities' => 'required|array',
-        'quantities.*.parcel_type_id' => ['required', 'integer', Rule::in($parcelTypes)],
-        'quantities.*.manifested' => 'required|integer|min:0',
-        'quantities.*.re_manifested' => 'required|integer|min:0',
-        'quantities.*.carried_forward' => 'required|integer|min:0',
-    ]);
-
-    DB::beginTransaction();
-    try {
-        // Create the manifest
-        $manifest = Manifest::create([
-            'delivery_date' => $validated['delivery_date'],
-            'status' => $validated['status'],
-            'round_id' => $validated['round_id'],
-        ]);
-
-        // Prepare data for bulk insert
-        $quantityData = array_map(function ($quantity) use ($manifest) {
-            return [
-                'manifest_id' => $manifest->id,
-                'parcel_type_id' => $quantity['parcel_type_id'],
-                'manifested' => $quantity['manifested'],
-                're_manifested' => $quantity['re_manifested'],
-                'carried_forward' => $quantity['carried_forward'],
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }, $validated['quantities']);
-
-        // Bulk insert quantities
-        ManifestSummary::insert($quantityData);
-
-        DB::commit();
-        return redirect()->route('dashboard')->with('success', 'Manifest created successfully!');
-    } catch (\Exception $e) {
-        DB::rollBack();
-        Log::error('Error creating manifest', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-        ]);
-        return redirect()->route('dashboard')->with('error', 'Failed to create manifest: ' . $e->getMessage());
-    }
-}
 
     public function show($id)
-{
-    try {
-        // Log the start of the method
-        Log::info('Starting show method', ['id' => $id]);
+    {
+        try {
+            Log::info('Starting show method', ['id' => $id]);
 
-        // Check if the user is authenticated
-        if (!auth()->check()) {
-            Log::error('User not authenticated');
-            return response()->json(['error' => 'Unauthenticated'], 401);
+            if (!auth()->check()) {
+                Log::error('User not authenticated');
+                return response()->json(['error' => 'Unauthenticated'], 401);
+            }
+
+            Log::info('User authenticated', ['user_id' => auth()->id()]);
+
+            $manifest = Manifest::with(['round', 'quantities'])->find($id);
+            if (!$manifest) {
+                Log::error('Manifest not found', ['id' => $id]);
+                return response()->json(['error' => 'Manifest not found'], 404);
+            }
+
+            Log::info('Manifest found', ['manifest' => $manifest->toArray()]);
+
+            if (!$manifest->round) {
+                Log::error('Round not found for manifest', ['id' => $id, 'round_id' => $manifest->round_id]);
+                return response()->json(['error' => 'Associated round not found'], 404);
+            }
+
+            Log::info('Round found', ['round' => $manifest->round->toArray()]);
+
+            if ($manifest->round->user_id !== auth()->id()) {
+                Log::error('Unauthorized access to manifest', ['id' => $id, 'user_id' => auth()->id()]);
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            Log::info('User authorized');
+
+            $quantities = [];
+            try {
+                if ($manifest->quantities && !$manifest->quantities->isEmpty()) {
+                    $quantities = $manifest->quantities->map(function ($quantity) {
+                        Log::info('Mapping quantity', ['quantity' => $quantity->toArray()]);
+                        return [
+                            'parcel_type_id' => (int) $quantity->parcel_type_id,
+                            'manifested' => (int) ($quantity->manifested ?? 0),
+                            're_manifested' => (int) ($quantity->re_manifested ?? 0),
+                            'carried_forward' => (int) ($quantity->carried_forward ?? 0),
+                        ];
+                    })->toArray();
+                } else {
+                    Log::warning('No quantities found for manifest', ['id' => $id]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Error processing quantities', [
+                    'id' => $id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+                $quantities = [];
+            }
+
+            Log::info('Manifest fetched successfully', ['id' => $id]);
+            return response()->json([
+                'id' => $manifest->id,
+                'delivery_date' => $manifest->delivery_date,
+                'status' => $manifest->status,
+                'round_id' => $manifest->round_id,
+                'quantities' => $quantities,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Error in show method', [
+                'id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['error' => 'Server error while fetching manifest'], 500);
         }
-
-        Log::info('User authenticated', ['user_id' => auth()->id()]);
-
-        // Fetch the manifest
-        $manifest = Manifest::with(['round', 'quantities'])->find($id);
-        if (!$manifest) {
-            Log::error('Manifest not found', ['id' => $id]);
-            return response()->json(['error' => 'Manifest not found'], 404);
-        }
-
-        Log::info('Manifest found', ['manifest' => $manifest->toArray()]);
-
-        // Check the round
-        if (!$manifest->round) {
-            Log::error('Round not found for manifest', ['id' => $id, 'round_id' => $manifest->round_id]);
-            return response()->json(['error' => 'Associated round not found'], 404);
-        }
-
-        Log::info('Round found', ['round' => $manifest->round->toArray()]);
-
-        // Check authorization
-        if ($manifest->round->user_id !== auth()->id()) {
-            Log::error('Unauthorized access to manifest', ['id' => $id, 'user_id' => auth()->id()]);
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-
-        Log::info('User authorized');
-
-        // Process quantities
-        $quantities = [];
-        if ($manifest->quantities && !$manifest->quantities->isEmpty()) {
-            $quantities = $manifest->quantities->map(function ($quantity) {
-                Log::info('Mapping quantity', ['quantity' => $quantity->toArray()]);
-                return [
-                    'parcel_type_id' => (int) $quantity->parcel_type_id,
-                    'manifested' => (int) ($quantity->manifested ?? 0),
-                    're_manifested' => (int) ($quantity->re_manifested ?? 0),
-                    'carried_forward' => (int) ($quantity->carried_forward ?? 0),
-                ];
-            })->toArray();
-        } else {
-            Log::warning('No quantities found for manifest', ['id' => $id]);
-        }
-
-        Log::info('Manifest fetched successfully', ['id' => $id]);
-        return response()->json([
-            'id' => $manifest->id,
-            'delivery_date' => $manifest->delivery_date,
-            'status' => $manifest->status,
-            'round_id' => $manifest->round_id,
-            'quantities' => $quantities,
-        ], 200);
-    } catch (\Exception $e) {
-        Log::error('Error in show method', [
-            'id' => $id,
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-        ]);
-        return response()->json(['error' => 'Server error while fetching manifest' + $e], 500);
     }
-}
 
     public function update(Request $request, $id)
     {
+        Log::info('Updating manifest', ['id' => $id, 'user_id' => auth()->id()]);
+
         $manifest = Manifest::findOrFail($id);
 
         if ($manifest->round->user_id !== auth()->id()) {
+            Log::error('Unauthorized to update manifest', ['id' => $id, 'user_id' => auth()->id()]);
             return redirect()->route('dashboard')->with('error', 'Unauthorized to update this manifest.');
         }
 
@@ -264,6 +391,7 @@ public function store(Request $request)
             ->first();
 
         if (!$round) {
+            Log::error('Selected round does not belong to user', ['round_id' => $validated['round_id'], 'user_id' => auth()->id()]);
             return redirect()->route('dashboard')->with('error', 'Selected round does not belong to you.');
         }
 
@@ -275,10 +403,8 @@ public function store(Request $request)
                 'round_id' => $validated['round_id'],
             ]);
 
-            // Delete existing quantities
             $manifest->quantities()->delete();
 
-            // Create new quantities
             foreach ($validated['quantities'] as $quantity) {
                 ManifestSummary::create([
                     'manifest_id' => $manifest->id,
@@ -290,16 +416,24 @@ public function store(Request $request)
             }
 
             DB::commit();
+            Log::info('Manifest updated successfully', ['manifest_id' => $manifest->id]);
+
             return redirect()->route('dashboard')->with('success', 'Manifest updated successfully!');
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Error updating manifest', [
+                'id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return redirect()->route('dashboard')->with('error', 'Failed to update manifest: ' . $e->getMessage());
         }
     }
 
     public function destroy($id)
     {
-        Log::info('Deleting manifest with ID:', ['id' => $id]);
+        Log::info('Deleting manifest with ID:', ['id' => $id, 'user_id' => auth()->id()]);
+
         $manifest = Manifest::findOrFail($id);
 
         if ($manifest->round->user_id !== auth()->id()) {

@@ -13,7 +13,7 @@ class DashboardController extends Controller
     public function index()
     {
         // Fetch all parcel types
-        $parcelTypes = ParcelType::all();
+        $parcelTypes = ParcelType::orderBy('sort_order')->get();
 
         // Fetch rounds for the authenticated user
         $rounds = Round::where('user_id', auth()->id())->get();
@@ -25,6 +25,7 @@ class DashboardController extends Controller
         $manifests = Manifest::with(['round', 'summaries.parcel_type'])
             ->where('user_id', auth()->id())
             ->orderBy('delivery_date', 'desc')
+            ->orderBy('round_id', 'asc')
             ->get()
             ->map(function ($manifest) use ($parcelTypes) {
                 // Debug: Log manifest and round data
