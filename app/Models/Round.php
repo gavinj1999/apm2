@@ -25,4 +25,8 @@ class Round extends Model
     {
         return $this->hasMany(Manifest::class);
     }
+    public function pricings(): HasMany
+    {
+        return $this->hasMany(RoundPricing::class, 'round_id', 'id');
+    }
 }

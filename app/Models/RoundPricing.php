@@ -11,7 +11,7 @@ class RoundPricing extends Model
 
     public function round(): BelongsTo
     {
-        return $this->belongsTo(Round::class);
+        return $this->belongsTo(Round::class, 'round_id', 'id');
     }
 
     public function parcelType(): BelongsTo

@@ -41,7 +41,7 @@ Route::middleware(['auth'])->group(function () {
 
 
 
-Route::middleware(['auth'])->get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+//Route::middleware(['auth'])->get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
 
 require __DIR__ . '/settings.php';

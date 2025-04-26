@@ -14,7 +14,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 // Props with default values
-const { groupedManifests, currentPeriodEarnings = 0, averageDailyIncome = 0, remainingDays = 0, currentPeriod = '', rounds, parcelTypes, flash } = defineProps<{
+const { groupedManifests, currentPeriodEarnings = 0, averageDailyIncome = 0, remainingDays = 0, currentPeriod = 'Unknown Period', rounds, parcelTypes, flash, debug = {} } = defineProps<{
     groupedManifests: Array<{
         period_name: string;
         dates: Array<{
@@ -44,18 +44,32 @@ const { groupedManifests, currentPeriodEarnings = 0, averageDailyIncome = 0, rem
     rounds: Array<{ id: number; round_id: string; name: string }>;
     parcelTypes: Array<{ id: number; name: string }>;
     flash?: { success?: string; error?: string };
+    debug?: {
+        user_id?: number;
+        roundIds?: number[];
+        parcelTypesCount?: number;
+        manifestsCount?: number;
+        periods?: Array<{ id: number; name: string; start_date: string; end_date: string }>;
+        currentDate?: string;
+        currentPeriodName?: string;
+        currentPeriodStart?: string;
+        currentPeriodEnd?: string;
+        manifestCount?: number;
+        manifestDates?: string[];
+        currentPeriodEarnings?: number;
+        daysWithManifests?: number;
+        averageDailyIncome?: number;
+        remainingDays?: number;
+        earningsResult?: { days_with_manifests?: number; total_earnings?: number };
+        earningsQueryError?: string;
+        remainingDaysQueryError?: string;
+        error?: string;
+        errorTrace?: string;
+    };
 }>();
 
-// Debug: Log the props to verify currentPeriod
-console.log('Props received:', {
-    currentPeriodEarnings,
-    averageDailyIncome,
-    remainingDays,
-    currentPeriod
-});
-
-// Use currentPeriod directly (remove fallback to avoid confusion)
-const displayPeriod = currentPeriod || 'Unknown Period';
+// Log debug values to console
+console.log('Debug Values:', debug);
 
 // Default delivery date (today)
 const now = new Date();
@@ -64,9 +78,56 @@ const month = String(now.getMonth() + 1).padStart(2, '0');
 const year = now.getFullYear();
 const defaultDeliveryDate = `${year}-${month}-${day}`;
 
-// State for edit mode
+// State for edit mode and period selection
 const isEditMode = ref(false);
 const editingManifestId = ref<number | null>(null);
+const selectedPeriod = ref(currentPeriod);
+
+// Filter out "Unassigned" periods and get available periods
+const availablePeriods = computed(() => {
+    if (!Array.isArray(groupedManifests)) {
+        return [];
+    }
+    return groupedManifests
+        .filter(group => group.period_name !== 'Unassigned')
+        .map(group => group.period_name);
+});
+
+// Automatically select the current period if available, otherwise the first available period
+if (availablePeriods.value.includes(currentPeriod)) {
+    selectedPeriod.value = currentPeriod;
+} else if (availablePeriods.value.length > 0) {
+    selectedPeriod.value = availablePeriods.value[0];
+}
+
+// Filter manifests by selected period
+const filteredManifests = computed(() => {
+    if (!Array.isArray(groupedManifests)) {
+        return [];
+    }
+    const selected = groupedManifests.find(group => group.period_name === selectedPeriod.value);
+    return selected ? selected.dates : [];
+});
+
+// Flatten filteredManifests into a list of rows for rendering
+const flattenedRows = computed(() => {
+    const rows = [];
+    if (Array.isArray(filteredManifests.value)) {
+        filteredManifests.value.forEach((dateGroup, dIndex) => {
+            if (Array.isArray(dateGroup?.manifests)) {
+                dateGroup.manifests.forEach((manifest, mIndex) => {
+                    rows.push({
+                        date: dateGroup.date,
+                        manifest: manifest,
+                        isFirstInDate: mIndex === 0,
+                        dateRowspan: dateGroup.manifests.length,
+                    });
+                });
+            }
+        });
+    }
+    return rows;
+});
 
 // Form for creating/updating a manifest
 const manifestForm = useForm({
@@ -79,27 +140,6 @@ const manifestForm = useForm({
         re_manifested: 0,
         carried_forward: 0
     })),
-});
-
-// Flatten groupedManifests into a list of rows for rendering
-const flattenedRows = computed(() => {
-    const rows = [];
-    groupedManifests.forEach((period, pIndex) => {
-        period.dates.forEach((date, dIndex) => {
-            date.manifests.forEach((manifest, mIndex) => {
-                rows.push({
-                    period: period.period_name,
-                    date: date.date,
-                    manifest: manifest,
-                    isFirstInPeriod: dIndex === 0 && mIndex === 0,
-                    isFirstInDate: mIndex === 0,
-                    periodRowspan: period.dates.reduce((sum, d) => sum + d.manifests.length, 0),
-                    dateRowspan: date.manifests.length,
-                });
-            });
-        });
-    });
-    return rows;
 });
 
 // Submit function (handles both create and update)
@@ -127,7 +167,6 @@ function editManifest(id: number) {
         headers: {
             Accept: 'application/json',
         },
-
     })
         .then(response => {
             if (!response.ok) {
@@ -138,10 +177,6 @@ function editManifest(id: number) {
         .then(data => {
             if (data.error) {
                 alert(data.error);
-                return;
-            }
-            if (!data.delivery_date || !data.status || !data.round_id) {
-                alert('Invalid manifest data received.');
                 return;
             }
             manifestForm.delivery_date = data.delivery_date;
@@ -181,15 +216,7 @@ function cancelEdit() {
 // Function to delete a manifest
 function deleteManifest(id: number, date: string) {
     if (confirm(`Are you sure you want to delete the manifest for ${formatDate(date)}?`)) {
-        router.delete(route('manifests.destroy', id), {
-            onSuccess: () => {
-                console.log('Manifest deleted successfully');
-            },
-            onError: (error) => {
-                console.error('Error deleting manifest:', error);
-                alert('Failed to delete manifest: ' + (error.message || 'Unknown error'));
-            }
-        });
+        router.delete(route('manifests.destroy', id));
     }
 }
 
@@ -207,10 +234,9 @@ function getTotals(form: any) {
 const leftColumnTypes = parcelTypes.slice(0, 4);
 const rightColumnTypes = parcelTypes.slice(4, 8);
 
-const manifestLabel = "M"
-const remanifestedLabel = "R"
-const carriedForwardLabel = "CF"
-
+const manifestLabel = "M";
+const remanifestedLabel = "R";
+const carriedForwardLabel = "CF";
 
 // Helper function to format date as DD/MM/YYYY
 function formatDate(dateStr: string): string {
@@ -233,6 +259,31 @@ function formatDate(dateStr: string): string {
             </div>
             <div v-if="flash?.error" class="mb-4 p-4 bg-red-600 text-white rounded-lg">
                 {{ flash.error }}
+            </div>
+
+            <!-- Debug Information -->
+            <div class="mb-6 p-4 bg-gray-700 rounded-lg">
+                <h3 class="text-lg font-semibold mb-2">Debug Information</h3>
+                <p>User ID: {{ debug.user_id ?? 'N/A' }}</p>
+                <p>Round IDs: {{ debug.roundIds?.join(', ') ?? 'N/A' }}</p>
+                <p>Parcel Types Count: {{ debug.parcelTypesCount ?? 'N/A' }}</p>
+                <p>Manifests Count: {{ debug.manifestsCount ?? 'N/A' }}</p>
+                <p>Periods: {{ debug.periods ? debug.periods.map(p => `${p.name}: ${p.start_date} to ${p.end_date}`).join('; ') : 'N/A' }}</p>
+                <p>Current Date: {{ debug.currentDate ?? 'N/A' }}</p>
+                <p>Current Period Name: {{ debug.currentPeriodName ?? 'N/A' }}</p>
+                <p>Current Period Start: {{ debug.currentPeriodStart ?? 'N/A' }}</p>
+                <p>Current Period End: {{ debug.currentPeriodEnd ?? 'N/A' }}</p>
+                <p>Manifest Count in Period: {{ debug.manifestCount ?? 'N/A' }}</p>
+                <p>Manifest Dates in Period: {{ debug.manifestDates?.join(', ') ?? 'N/A' }}</p>
+                <p>Earnings Result: {{ debug.earningsResult ? `Days: ${debug.earningsResult.days_with_manifests}, Earnings: £${debug.earningsResult.total_earnings}` : 'N/A' }}</p>
+                <p v-if="debug.earningsQueryError">Earnings Query Error: {{ debug.earningsQueryError }}</p>
+                <p>Current Period Earnings: £{{ debug.currentPeriodEarnings?.toFixed(2) ?? 'N/A' }}</p>
+                <p>Days with Manifests: {{ debug.daysWithManifests ?? 'N/A' }}</p>
+                <p>Average Daily Income: £{{ debug.averageDailyIncome?.toFixed(2) ?? 'N/A' }}</p>
+                <p>Remaining Days: {{ debug.remainingDays ?? 'N/A' }}</p>
+                <p v-if="debug.remainingDaysQueryError">Remaining Days Query Error: {{ debug.remainingDaysQueryError }}</p>
+                <p v-if="debug.error">Error: {{ debug.error }}</p>
+                <p v-if="debug.errorTrace">Error Trace: {{ debug.errorTrace }}</p>
             </div>
 
             <!-- Create/Update Manifest Form -->
@@ -391,34 +442,47 @@ function formatDate(dateStr: string): string {
                 </form>
             </div>
 
-            <!-- Manifest Summary -->
-            <h2 class="text-xl font-semibold mb-4">Period Summary</h2>
+            <!-- Period Selection -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2">Select Period</label>
+                <select
+                    v-model="selectedPeriod"
+                    class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                    :disabled="availablePeriods.length === 0"
+                >
+                    <option v-if="availablePeriods.length === 0" disabled>No periods available</option>
+                    <option v-for="period in availablePeriods" :key="period" :value="period">
+                        {{ period }}
+                    </option>
+                </select>
+            </div>
+
+            <!-- Current Period Summary -->
+            <h2 class="text-xl font-semibold mb-4">{{ currentPeriod }} Summary</h2>
             <div class="mb-6 p-4 bg-gray-700 rounded-lg">
                 <div class="flex flex-col gap-2 text-lg">
                     <p>
-                        Total Earnings ({{ displayPeriod }}):
-                        <span class="font-bold">£{{ (currentPeriodEarnings || 0).toFixed(2) }}</span>
+                        Total Earnings:
+                        <span class="font-bold">£{{ currentPeriodEarnings.toFixed(2) }}</span>
                     </p>
                     <p>
-                        Average Daily Income ({{ displayPeriod }}):
-                        <span class="font-bold">£{{ (averageDailyIncome || 0).toFixed(2) }}</span>
+                        Average Daily Income:
+                        <span class="font-bold">£{{ averageDailyIncome.toFixed(2) }}</span>
                     </p>
                     <p>
-                        Days Remaining in {{ displayPeriod }}:
-                        <span class="font-bold">{{ remainingDays || 0 }}</span>
+                        Days Remaining in Period:
+                        <span class="font-bold">{{ remainingDays }}</span>
                     </p>
                 </div>
             </div>
-            <div v-if="groupedManifests.length === 0" class="text-gray-400">
-                No manifests available.
+            <div v-if="flattenedRows.length === 0" class="text-gray-400">
+                No manifests available for this period.
             </div>
             <div v-else class="bg-gray-800 rounded-lg shadow-lg overflow-x-auto">
                 <table class="w-full border border-gray-600">
                     <thead>
                         <tr class="bg-gray-700">
-                            <th class="p-3 text-left text-sm font-medium">Period</th>
                             <th class="p-3 text-left text-sm font-medium">Date</th>
-
                             <th class="p-3 text-left text-sm font-medium">Round</th>
                             <th v-for="type in parcelTypes" :key="type.id" class="p-3 text-left text-sm font-medium">{{ type.name }}</th>
                             <th class="p-3 text-left text-sm font-medium">Total Value</th>
@@ -427,26 +491,22 @@ function formatDate(dateStr: string): string {
                     </thead>
                     <tbody>
                         <tr v-for="(row, index) in flattenedRows" :key="row.manifest.id" class="border-b border-gray-600">
-                            <td v-if="row.isFirstInPeriod" :rowspan="row.periodRowspan" class="p-3 font-semibold">
-                                {{ row.period }}
-                            </td>
                             <td v-if="row.isFirstInDate" :rowspan="row.dateRowspan" class="p-3">
                                 {{ formatDate(row.date) }}
                             </td>
-
                             <td class="p-3">
                                 {{ row.manifest.round_id }}
                             </td>
                             <td v-for="type in parcelTypes" :key="type.id" class="p-3 relative group">
                                 <span class="cursor-pointer">
-                                    {{ row.manifest.quantities.find(q => q.parcel_type_id === type.id).total }}
+                                    {{ row.manifest.quantities.find(q => q.parcel_type_id === type.id)?.total ?? 0 }}
                                     <span class="absolute hidden group-hover:block bg-gray-600 text-white text-xs rounded py-1 px-2 -mt-8 left-1/2 transform -translate-x-1/2">
-                                        Value: £{{ row.manifest.quantities.find(q => q.parcel_type_id === type.id).value.toFixed(2) }}
+                                        Value: £{{ (row.manifest.quantities.find(q => q.parcel_type_id === type.id)?.value ?? 0).toFixed(2) }}
                                     </span>
                                 </span>
                             </td>
                             <td class="p-3">
-                                £{{ row.manifest.total_value.toFixed(2) }}
+                                £{{ (row.manifest.total_value || 0).toFixed(2) }}
                             </td>
                             <td class="p-3 flex gap-1">
                                 <button

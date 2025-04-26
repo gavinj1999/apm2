@@ -10,7 +10,6 @@ use App\Models\Period;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
@@ -20,32 +19,27 @@ class ManifestController extends Controller
 {
     public function index()
     {
+
+        $debug = []; // Initialize debug array
+
         try {
             $user = auth()->user();
-            Log::info('User authenticated', ['user_id' => $user->id]);
+            $debug['user_id'] = $user->id;
 
             $rounds = Round::where('user_id', $user->id)->get();
             $roundIds = $rounds->pluck('id')->toArray();
-            Log::info('User rounds fetched', ['user_id' => $user->id, 'round_ids' => $roundIds]);
-
-            if (empty($roundIds)) {
-                Log::warning('No rounds found for user', ['user_id' => $user->id]);
-            }
+            $debug['roundIds'] = $roundIds;
 
             $parcelTypes = ParcelType::all();
+            $debug['parcelTypesCount'] = $parcelTypes->count();
 
             $manifests = Manifest::whereIn('round_id', $roundIds)
                 ->with(['round', 'quantities'])
                 ->get();
-
-            Log::info('Manifests fetched for user', [
-                'user_id' => $user->id,
-                'manifest_count' => $manifests->count(),
-                'manifest_round_ids' => $manifests->pluck('round_id')->unique()->toArray(),
-            ]);
+            $debug['manifestsCount'] = $manifests->count();
 
             $periods = Period::all();
-            Log::info('Periods fetched', ['period_count' => $periods->count()]);
+            $debug['periods'] = $periods->toArray();
 
             $groupedManifests = $manifests->groupBy(function ($manifest) use ($periods) {
                 $manifestDate = Carbon::parse($manifest->delivery_date);
@@ -76,11 +70,7 @@ class ManifestController extends Controller
                                     return $manifest->quantities->where('parcel_type_id', $type->id)->sum('carried_forward') ?? 0;
                                 });
                             } catch (\Exception $e) {
-                                Log::error('Error calculating quantities', [
-                                    'round_id' => $roundGroup->first()->round_id,
-                                    'parcel_type_id' => $type->id,
-                                    'error' => $e->getMessage(),
-                                ]);
+                                // Silent catch
                             }
 
                             $total = $totalManifested + $totalReManifested + $totalCarriedForward;
@@ -107,26 +97,26 @@ class ManifestController extends Controller
                             'id' => $roundGroup->first()->id,
                             'manifest_number' => $roundGroup->first()->manifest_number,
                             'delivery_date' => $date,
-                            'round_id' => $roundId, // Use the round_id from the manifests table directly
-                            'quantities' => $quantities,
+                            'round_id' => $roundId,
+                            'quantities' => $quantities->toArray(),
                             'total_value' => $totalValue,
                         ];
                     })->values();
 
                     return [
                         'date' => $date,
-                        'manifests' => $byRound,
+                        'manifests' => $byRound->toArray(),
                     ];
                 })->sortByDesc('date')->values();
 
                 return [
                     'period_name' => $periodName,
-                    'dates' => $byDate,
+                    'dates' => $byDate->toArray(),
                 ];
             })->sortByDesc('period_name')->values();
 
             $currentDate = Carbon::today();
-            Log::info('Current date', ['current_date' => $currentDate->toDateString()]);
+            $debug['currentDate'] = $currentDate->toDateString();
 
             $currentPeriod = null;
             foreach ($periods as $period) {
@@ -139,7 +129,6 @@ class ManifestController extends Controller
             }
 
             if (!$currentPeriod) {
-                Log::warning('No current period found for today', ['current_date' => $currentDate->toDateString()]);
                 $currentPeriodName = 'Unknown Period';
                 $currentPeriodStart = $currentDate;
                 $currentPeriodEnd = $currentDate;
@@ -147,91 +136,106 @@ class ManifestController extends Controller
                 $currentPeriodName = $currentPeriod->name;
                 $currentPeriodStart = Carbon::parse($currentPeriod->start_date);
                 $currentPeriodEnd = Carbon::parse($currentPeriod->end_date);
-                Log::info('Current period calculated', [
-                    'current_period' => $currentPeriodName,
-                    'start_date' => $currentPeriodStart->toDateString(),
-                    'end_date' => $currentPeriodEnd->toDateString(),
-                ]);
             }
+
+            $debug['currentPeriodName'] = $currentPeriodName;
+            $debug['currentPeriodStart'] = $currentPeriodStart->toDateString();
+            $debug['currentPeriodEnd'] = $currentPeriodEnd->toDateString();
 
             $currentPeriodManifests = $manifests->filter(function ($manifest) use ($currentPeriodStart, $currentPeriodEnd) {
                 $manifestDate = Carbon::parse($manifest->delivery_date);
                 return $manifestDate->between($currentPeriodStart, $currentPeriodEnd);
             });
 
-            Log::info('Current period manifests', [
-                'count' => $currentPeriodManifests->count(),
-                'manifest_round_ids' => $currentPeriodManifests->pluck('round_id')->unique()->toArray(),
-            ]);
+            $debug['manifestCount'] = $currentPeriodManifests->count();
+            $debug['manifestDates'] = $currentPeriodManifests->pluck('delivery_date')->toArray();
 
-            $currentPeriodEarnings = (float) $currentPeriodManifests->sum(function ($manifest) {
-                $quantitiesTotal = 0;
-                try {
-                    $quantitiesTotal = $manifest->quantities->sum(function ($quantity) use ($manifest) {
-                        $price = DB::table('round_pricings')
-                            ->where('round_id', $manifest->round_id)
-                            ->where('parcel_type_id', $quantity->parcel_type_id)
-                            ->value('price') ?? 0;
-                        $quantityTotal = $quantity->manifested + $quantity->re_manifested + $quantity->carried_forward;
-                        $value = $quantityTotal * $price;
-                        Log::info('Calculating quantity value for manifest', [
-                            'manifest_id' => $manifest->id,
-                            'round_id' => $manifest->round_id,
-                            'parcel_type_id' => $quantity->parcel_type_id,
-                            'quantity_total' => $quantityTotal,
-                            'price' => $price,
-                            'value' => $value,
-                        ]);
-                        return $value;
-                    });
-                    Log::info('Total earnings for manifest', [
-                        'manifest_id' => $manifest->id,
-                        'quantities_total' => $quantitiesTotal,
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error('Error calculating total earnings for manifest', [
-                        'manifest_id' => $manifest->id,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-                return $quantitiesTotal;
-            });
+            // Calculate total earnings and days with manifests using SQL
+            try {
+                $earningsResult = DB::selectOne("
+                    SELECT
+                        COUNT(DISTINCT m.delivery_date) AS days_with_manifests,
+                        SUM(
+                            (ms.manifested + ms.re_manifested + ms.carried_forward) *
+                            COALESCE(rp.price, 0)
+                        ) AS total_earnings
+                    FROM manifests m
+                    LEFT JOIN manifest_summaries ms ON m.id = ms.manifest_id
+                    LEFT JOIN round_pricings rp
+                        ON m.round_id = rp.round_id
+                        AND ms.parcel_type_id = rp.parcel_type_id
+                    WHERE m.delivery_date BETWEEN ? AND ?
+                    AND m.round_id IN (SELECT id FROM rounds WHERE user_id = ?)
+                ", [$currentPeriodStart, $currentPeriodEnd, $user->id]);
 
-            $daysWithManifests = $currentPeriodManifests->groupBy('delivery_date')->count();
+                $debug['earningsResult'] = (array) $earningsResult;
+            } catch (\Exception $e) {
+                $debug['earningsQueryError'] = $e->getMessage();
+                $earningsResult = null;
+            }
+
+            $currentPeriodEarnings = (float) ($earningsResult->total_earnings ?? 0.0);
+            $daysWithManifests = (int) ($earningsResult->days_with_manifests ?? 0);
             $averageDailyIncome = $daysWithManifests > 0 ? (float) ($currentPeriodEarnings / $daysWithManifests) : 0.0;
 
-            $remainingDays = $currentDate->diffInDays($currentPeriodEnd);
+            $debug['currentPeriodEarnings'] = $currentPeriodEarnings;
+            $debug['daysWithManifests'] = $daysWithManifests;
+            $debug['averageDailyIncome'] = $averageDailyIncome;
 
-            Log::info('Dashboard metrics calculated', [
-                'currentPeriod' => $currentPeriodName,
-                'currentPeriodEarnings' => $currentPeriodEarnings,
-                'averageDailyIncome' => $averageDailyIncome,
-                'remainingDays' => $remainingDays,
-            ]);
+            // Calculate remaining days using SQL
+            try {
+                $remainingDaysResult = DB::selectOne("
+                    SELECT
+                        GREATEST(
+                            DATEDIFF(
+                                (SELECT end_date
+                                 FROM periods
+                                 WHERE start_date <= ?
+                                   AND end_date >= ?),
+                                ?
+                            ),
+                            0
+                        ) AS days_remaining
+                ", [$currentDate->toDateString(), $currentDate->toDateString(), $currentDate->toDateString()]);
+
+                $remainingDays = $remainingDaysResult ? (int) $remainingDaysResult->days_remaining : 0;
+                $debug['remainingDays'] = $remainingDays;
+            } catch (\Exception $e) {
+                $debug['remainingDaysQueryError'] = $e->getMessage();
+                $remainingDays = 0;
+            }
 
             return Inertia::render('Dashboard', [
-                'groupedManifests' => $groupedManifests,
+                'groupedManifests' => $groupedManifests->toArray(),
                 'currentPeriodEarnings' => $currentPeriodEarnings,
                 'averageDailyIncome' => $averageDailyIncome,
                 'remainingDays' => $remainingDays,
                 'currentPeriod' => $currentPeriodName,
-                'rounds' => $rounds,
-                'parcelTypes' => $parcelTypes,
+                'rounds' => $rounds->toArray(),
+                'parcelTypes' => $parcelTypes->toArray(),
                 'flash' => session('flash', []),
+                'debug' => $debug,
             ]);
         } catch (\Exception $e) {
-            Log::error('Error in index method', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+            $debug['error'] = $e->getMessage();
+            $debug['errorTrace'] = $e->getTraceAsString();
+
+            return Inertia::render('Dashboard', [
+                'groupedManifests' => [],
+                'currentPeriodEarnings' => 0.0,
+                'averageDailyIncome' => 0.0,
+                'remainingDays' => 0,
+                'currentPeriod' => 'Error',
+                'rounds' => [],
+                'parcelTypes' => [],
+                'flash' => session('flash', []),
+                'debug' => $debug,
             ]);
-            return redirect()->route('dashboard')->with('error', 'An error occurred while loading the dashboard.');
         }
     }
 
     public function store(Request $request)
     {
-        Log::info('Storing new manifest', ['user_id' => auth()->id()]);
-
         $parcelTypes = Cache::remember('parcel_types_ids', 60 * 60 * 24, function () {
             return ParcelType::pluck('id')->toArray();
         });
@@ -252,7 +256,6 @@ class ManifestController extends Controller
         DB::beginTransaction();
         try {
             $manifestNumber = 'MAN-' . now()->format('Ymd') . '-' . Str::random(8);
-            Log::info('Generating manifest number', ['manifest_number' => $manifestNumber]);
 
             $manifest = Manifest::create([
                 'manifest_number' => $manifestNumber,
@@ -276,15 +279,10 @@ class ManifestController extends Controller
             ManifestSummary::insert($quantityData);
 
             DB::commit();
-            Log::info('Manifest created successfully', ['manifest_id' => $manifest->id]);
 
             return redirect()->route('dashboard')->with('success', 'Manifest created successfully!');
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Error creating manifest', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
             return redirect()->route('dashboard')->with('error', 'Failed to create manifest: ' . $e->getMessage());
         }
     }
@@ -292,42 +290,27 @@ class ManifestController extends Controller
     public function show($id)
     {
         try {
-            Log::info('Starting show method', ['id' => $id]);
-
             if (!auth()->check()) {
-                Log::error('User not authenticated');
                 return response()->json(['error' => 'Unauthenticated'], 401);
             }
 
-            Log::info('User authenticated', ['user_id' => auth()->id()]);
-
             $manifest = Manifest::with(['round', 'quantities'])->find($id);
             if (!$manifest) {
-                Log::error('Manifest not found', ['id' => $id]);
                 return response()->json(['error' => 'Manifest not found'], 404);
             }
 
-            Log::info('Manifest found', ['manifest' => $manifest->toArray()]);
-
             if (!$manifest->round) {
-                Log::error('Round not found for manifest', ['id' => $id, 'round_id' => $manifest->round_id]);
                 return response()->json(['error' => 'Associated round not found'], 404);
             }
 
-            Log::info('Round found', ['round' => $manifest->round->toArray()]);
-
             if ($manifest->round->user_id !== auth()->id()) {
-                Log::error('Unauthorized access to manifest', ['id' => $id, 'user_id' => auth()->id()]);
                 return response()->json(['error' => 'Unauthorized'], 403);
             }
-
-            Log::info('User authorized');
 
             $quantities = [];
             try {
                 if ($manifest->quantities && !$manifest->quantities->isEmpty()) {
                     $quantities = $manifest->quantities->map(function ($quantity) {
-                        Log::info('Mapping quantity', ['quantity' => $quantity->toArray()]);
                         return [
                             'parcel_type_id' => (int) $quantity->parcel_type_id,
                             'manifested' => (int) ($quantity->manifested ?? 0),
@@ -335,19 +318,11 @@ class ManifestController extends Controller
                             'carried_forward' => (int) ($quantity->carried_forward ?? 0),
                         ];
                     })->toArray();
-                } else {
-                    Log::warning('No quantities found for manifest', ['id' => $id]);
                 }
             } catch (\Exception $e) {
-                Log::error('Error processing quantities', [
-                    'id' => $id,
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                ]);
                 $quantities = [];
             }
 
-            Log::info('Manifest fetched successfully', ['id' => $id]);
             return response()->json([
                 'id' => $manifest->id,
                 'delivery_date' => $manifest->delivery_date,
@@ -356,23 +331,15 @@ class ManifestController extends Controller
                 'quantities' => $quantities,
             ], 200);
         } catch (\Exception $e) {
-            Log::error('Error in show method', [
-                'id' => $id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
             return response()->json(['error' => 'Server error while fetching manifest'], 500);
         }
     }
 
     public function update(Request $request, $id)
     {
-        Log::info('Updating manifest', ['id' => $id, 'user_id' => auth()->id()]);
-
         $manifest = Manifest::findOrFail($id);
 
         if ($manifest->round->user_id !== auth()->id()) {
-            Log::error('Unauthorized to update manifest', ['id' => $id, 'user_id' => auth()->id()]);
             return redirect()->route('dashboard')->with('error', 'Unauthorized to update this manifest.');
         }
 
@@ -392,7 +359,6 @@ class ManifestController extends Controller
             ->first();
 
         if (!$round) {
-            Log::error('Selected round does not belong to user', ['round_id' => $validated['round_id'], 'user_id' => auth()->id()]);
             return redirect()->route('dashboard')->with('error', 'Selected round does not belong to you.');
         }
 
@@ -417,34 +383,24 @@ class ManifestController extends Controller
             }
 
             DB::commit();
-            Log::info('Manifest updated successfully', ['manifest_id' => $manifest->id]);
 
             return redirect()->route('dashboard')->with('success', 'Manifest updated successfully!');
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Error updating manifest', [
-                'id' => $id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            return redirect()->route('dashboard')->with('error', 'Failed to update manifest: ' . $e->getMessage());
+            return redirect()->route('dashboard')->with('error', 'Failed to create manifest: ' . $e->getMessage());
         }
     }
 
     public function destroy($id)
     {
-        Log::info('Deleting manifest with ID:', ['id' => $id, 'user_id' => auth()->id()]);
-
         $manifest = Manifest::findOrFail($id);
 
         if ($manifest->round->user_id !== auth()->id()) {
-            Log::error('Unauthorized to delete manifest:', ['id' => $id, 'user_id' => auth()->id()]);
             return redirect()->route('dashboard')->with('error', 'Unauthorized to delete this manifest.');
         }
 
         $manifest->delete();
 
-        Log::info('Manifest deleted successfully:', ['id' => $id]);
         return redirect()->route('dashboard')->with('success', 'Manifest deleted successfully!');
     }
 }
