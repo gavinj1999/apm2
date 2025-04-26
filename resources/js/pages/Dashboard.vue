@@ -207,6 +207,11 @@ function getTotals(form: any) {
 const leftColumnTypes = parcelTypes.slice(0, 4);
 const rightColumnTypes = parcelTypes.slice(4, 8);
 
+const manifestLabel = "M"
+const remanifestedLabel = "R"
+const carriedForwardLabel = "CF"
+
+
 // Helper function to format date as DD/MM/YYYY
 function formatDate(dateStr: string): string {
     const date = new Date(dateStr);
@@ -282,7 +287,7 @@ function formatDate(dateStr: string): string {
                                     <label class="block text-sm font-medium mb-2">{{ type.name }}</label>
                                     <div class="grid grid-cols-3 gap-3">
                                         <div>
-                                            <label class="block text-xs text-gray-400 mb-1">Manifested</label>
+                                            <label class="block text-xs text-gray-400 mb-1">{{ manifestLabel }}</label>
                                             <input
                                                 v-model.number="manifestForm.quantities.find(q => q.parcel_type_id === type.id).manifested"
                                                 type="number"
@@ -291,7 +296,7 @@ function formatDate(dateStr: string): string {
                                             />
                                         </div>
                                         <div>
-                                            <label class="block text-xs text-gray-400 mb-1">Re-manifested</label>
+                                            <label class="block text-xs text-gray-400 mb-1">{{ remanifestedLabel }}</label>
                                             <input
                                                 v-model.number="manifestForm.quantities.find(q => q.parcel_type_id === type.id).re_manifested"
                                                 type="number"
@@ -300,7 +305,7 @@ function formatDate(dateStr: string): string {
                                             />
                                         </div>
                                         <div>
-                                            <label class="block text-xs text-gray-400 mb-1">Carried Forward</label>
+                                            <label class="block text-xs text-gray-400 mb-1">{{ carriedForwardLabel }}</label>
                                             <input
                                                 v-model.number="manifestForm.quantities.find(q => q.parcel_type_id === type.id).carried_forward"
                                                 type="number"
@@ -316,7 +321,7 @@ function formatDate(dateStr: string): string {
                                     <label class="block text-sm font-medium mb-2">{{ type.name }}</label>
                                     <div class="grid grid-cols-3 gap-3">
                                         <div>
-                                            <label class="block text-xs text-gray-400 mb-1">Manifested</label>
+                                            <label class="block text-xs text-gray-400 mb-1">{{ manifestLabel }}</label>
                                             <input
                                                 v-model.number="manifestForm.quantities.find(q => q.parcel_type_id === type.id).manifested"
                                                 type="number"
@@ -325,7 +330,7 @@ function formatDate(dateStr: string): string {
                                             />
                                         </div>
                                         <div>
-                                            <label class="block text-xs text-gray-400 mb-1">Re-manifested</label>
+                                            <label class="block text-xs text-gray-400 mb-1">{{ remanifestedLabel }}</label>
                                             <input
                                                 v-model.number="manifestForm.quantities.find(q => q.parcel_type_id === type.id).re_manifested"
                                                 type="number"
@@ -334,7 +339,7 @@ function formatDate(dateStr: string): string {
                                             />
                                         </div>
                                         <div>
-                                            <label class="block text-xs text-gray-400 mb-1">Carried Forward</label>
+                                            <label class="block text-xs text-gray-400 mb-1">{{ carriedForwardLabel }}</label>
                                             <input
                                                 v-model.number="manifestForm.quantities.find(q => q.parcel_type_id === type.id).carried_forward"
                                                 type="number"
@@ -387,7 +392,7 @@ function formatDate(dateStr: string): string {
             </div>
 
             <!-- Manifest Summary -->
-            <h2 class="text-xl font-semibold mb-4">Manifest Summary</h2>
+            <h2 class="text-xl font-semibold mb-4">Period Summary</h2>
             <div class="mb-6 p-4 bg-gray-700 rounded-lg">
                 <div class="flex flex-col gap-2 text-lg">
                     <p>
@@ -413,7 +418,7 @@ function formatDate(dateStr: string): string {
                         <tr class="bg-gray-700">
                             <th class="p-3 text-left text-sm font-medium">Period</th>
                             <th class="p-3 text-left text-sm font-medium">Date</th>
-                            <th class="p-3 text-left text-sm font-medium">Manifest Number</th>
+
                             <th class="p-3 text-left text-sm font-medium">Round</th>
                             <th v-for="type in parcelTypes" :key="type.id" class="p-3 text-left text-sm font-medium">{{ type.name }}</th>
                             <th class="p-3 text-left text-sm font-medium">Total Value</th>
@@ -428,9 +433,7 @@ function formatDate(dateStr: string): string {
                             <td v-if="row.isFirstInDate" :rowspan="row.dateRowspan" class="p-3">
                                 {{ formatDate(row.date) }}
                             </td>
-                            <td class="p-3">
-                                {{ row.manifest.manifest_number }}
-                            </td>
+
                             <td class="p-3">
                                 {{ row.manifest.round_id }}
                             </td>
