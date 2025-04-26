@@ -19,7 +19,6 @@ class ManifestController extends Controller
 {
     public function index()
     {
-
         $debug = []; // Initialize debug array
 
         try {
@@ -280,10 +279,14 @@ class ManifestController extends Controller
 
             DB::commit();
 
-            return redirect()->route('dashboard')->with('success', 'Manifest created successfully!');
+            return redirect()->route('dashboard')->with('flash', [
+                'success' => 'Manifest created successfully!'
+            ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->route('dashboard')->with('error', 'Failed to create manifest: ' . $e->getMessage());
+            return redirect()->route('dashboard')->with('flash', [
+                'error' => 'Failed to create manifest: ' . $e->getMessage()
+            ]);
         }
     }
 
@@ -340,7 +343,9 @@ class ManifestController extends Controller
         $manifest = Manifest::findOrFail($id);
 
         if ($manifest->round->user_id !== auth()->id()) {
-            return redirect()->route('dashboard')->with('error', 'Unauthorized to update this manifest.');
+            return redirect()->route('dashboard')->with('flash', [
+                'error' => 'Unauthorized to update this manifest.'
+            ]);
         }
 
         $validated = $request->validate([
@@ -359,7 +364,9 @@ class ManifestController extends Controller
             ->first();
 
         if (!$round) {
-            return redirect()->route('dashboard')->with('error', 'Selected round does not belong to you.');
+            return redirect()->route('dashboard')->with('flash', [
+                'error' => 'Selected round does not belong to you.'
+            ]);
         }
 
         DB::beginTransaction();
@@ -384,10 +391,14 @@ class ManifestController extends Controller
 
             DB::commit();
 
-            return redirect()->route('dashboard')->with('success', 'Manifest updated successfully!');
+            return redirect()->route('dashboard')->with('flash', [
+                'success' => 'Manifest updated successfully!'
+            ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->route('dashboard')->with('error', 'Failed to create manifest: ' . $e->getMessage());
+            return redirect()->route('dashboard')->with('flash', [
+                'error' => 'Failed to update manifest: ' . $e->getMessage()
+            ]);
         }
     }
 
@@ -396,11 +407,15 @@ class ManifestController extends Controller
         $manifest = Manifest::findOrFail($id);
 
         if ($manifest->round->user_id !== auth()->id()) {
-            return redirect()->route('dashboard')->with('error', 'Unauthorized to delete this manifest.');
+            return redirect()->route('dashboard')->with('flash', [
+                'error' => 'Unauthorized to delete this manifest.'
+            ]);
         }
 
         $manifest->delete();
 
-        return redirect()->route('dashboard')->with('success', 'Manifest deleted successfully!');
+        return redirect()->route('dashboard')->with('flash', [
+            'success' => 'Manifest deleted successfully!'
+        ]);
     }
 }

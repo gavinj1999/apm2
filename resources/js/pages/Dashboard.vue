@@ -144,18 +144,28 @@ const manifestForm = useForm({
 
 // Submit function (handles both create and update)
 function submitManifest() {
+    isProcessing.value = true; // Indicate form is processing
+
     if (isEditMode.value && editingManifestId.value) {
         manifestForm.put(route('manifests.update-by-id', editingManifestId.value), {
             onSuccess: () => {
                 isEditMode.value = false;
                 editingManifestId.value = null;
                 manifestForm.reset();
+                isProcessing.value = false; // Form processing complete
+            },
+            onError: () => {
+                isProcessing.value = false; // Form processing complete, even on error
             },
         });
     } else {
         manifestForm.post(route('manifests.store'), {
             onSuccess: () => {
                 manifestForm.reset();
+                isProcessing.value = false; // Form processing complete
+            },
+            onError: () => {
+                isProcessing.value = false; // Form processing complete, even on error
             },
         });
     }
@@ -342,6 +352,9 @@ const highestAndLowestDays = computed(() => {
         lowest: lowest ? { date: formatDate(lowest.date), value: lowest.totalValue.toFixed(2) } : null,
     };
 });
+
+// State to track if the form is processing
+const isProcessing = ref(false);
 </script>
 
 <template>
@@ -351,6 +364,9 @@ const highestAndLowestDays = computed(() => {
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="p-6 bg-gray-900 min-h-screen text-white">
             <!-- Flash Messages -->
+            <div v-if="isProcessing" class="mb-4 p-4 bg-yellow-600 text-white rounded-lg">
+            Processing {{ isEditMode ? 'update' : 'creation' }} of manifest...
+        </div>
             <div v-if="flash?.success" class="mb-4 p-4 bg-green-600 text-white rounded-lg">
                 {{ flash.success }}
             </div>
