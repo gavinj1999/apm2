@@ -275,6 +275,73 @@ function getRoundName(roundId: string): string {
     const round = rounds.find(r => r.id === Number(roundId));
     return round ? round.name : 'Unknown Round';
 }
+
+// Function to download the table as a CSV
+function downloadTableAsCSV() {
+    // Define CSV headers
+    const headers = ['Date', 'Round', ...parcelTypes.map(type => type.name), 'Total Value', 'Actions'];
+
+    // Map table rows to CSV rows
+    const csvRows = flattenedRows.value.map(row => {
+        const date = formatDate(row.date); // Show date on every row
+        const roundName = getRoundName(row.manifest.round_id);
+        const parcelQuantities = parcelTypes.map(type =>
+            row.manifest.quantities.find(q => q.parcel_type_id === type.id)?.total ?? 0
+        );
+        const totalValue = (row.manifest.total_value || 0).toFixed(2); // Remove £ symbol
+        const actions = ''; // Actions column will be empty in CSV
+        return [date, roundName, ...parcelQuantities, totalValue, actions];
+    });
+
+    // Combine headers and rows into CSV content (no footer)
+    const csvContent = [
+        headers,
+        ...csvRows,
+    ]
+        .map(row => row.map(cell => `"${cell}"`).join(',')) // Wrap each cell in quotes to handle commas
+        .join('\n');
+
+    // Create a Blob and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `manifests_${selectedPeriod.value}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+// Compute highest and lowest days by total_value
+const highestAndLowestDays = computed(() => {
+    // Aggregate total_value by date
+    const totalsByDate: { [date: string]: { totalValue: number; date: string } } = {};
+
+    flattenedRows.value.forEach(row => {
+        const date = row.date;
+        if (!totalsByDate[date]) {
+            totalsByDate[date] = { totalValue: 0, date };
+        }
+        totalsByDate[date].totalValue += row.manifest.total_value || 0;
+    });
+
+    // Convert to array and sort by total_value
+    const dateEntries = Object.values(totalsByDate);
+    if (dateEntries.length === 0) {
+        return { highest: null, lowest: null };
+    }
+
+    dateEntries.sort((a, b) => b.totalValue - a.totalValue);
+
+    // Highest and lowest days
+    const highest = dateEntries[0]; // Highest total_value
+    const lowest = dateEntries[dateEntries.length - 1]; // Lowest total_value
+
+    return {
+        highest: highest ? { date: formatDate(highest.date), value: highest.totalValue.toFixed(2) } : null,
+        lowest: lowest ? { date: formatDate(lowest.date), value: lowest.totalValue.toFixed(2) } : null,
+    };
+});
 </script>
 
 <template>
@@ -471,24 +538,52 @@ function getRoundName(roundId: string): string {
                 </select>
             </div>
 
-            <!-- Current Period Summary -->
-            <h2 class="text-xl font-semibold mb-4">{{ currentPeriod }} Summary</h2>
-            <div class="mb-6 p-4 bg-gray-700 rounded-lg">
-                <div class="flex flex-col gap-2 text-lg">
-                    <p>
-                        Total Earnings:
-                        <span class="font-bold">£{{ currentPeriodEarnings.toFixed(2) }}</span>
-                    </p>
-                    <p>
-                        Average Daily Income:
-                        <span class="font-bold">£{{ averageDailyIncome.toFixed(2) }}</span>
-                    </p>
-                    <p>
-                        Days Remaining in Period:
-                        <span class="font-bold">{{ remainingDays }}</span>
-                    </p>
-                </div>
-            </div>
+<!-- Current Period Summary -->
+<h2 class="text-xl font-semibold mb-4">{{ currentPeriod }} Summary</h2>
+<div class="mb-6 p-4 bg-gray-700 rounded-lg flex flex-col md:flex-row gap-4">
+    <!-- Summary Content -->
+    <div class="flex-1">
+        <div class="flex flex-col gap-4 text-lg">
+            <p>
+                Total Earnings:
+                <span class="font-bold">£{{ currentPeriodEarnings.toFixed(2) }}</span>
+            </p>
+            <p>
+                Average Daily Income:
+                <span class="font-bold">£{{ averageDailyIncome.toFixed(2) }}</span>
+            </p>
+            <p>
+                Days Remaining in Period:
+                <span class="font-bold">{{ remainingDays }}</span>
+            </p>
+        </div>
+    </div>
+    <!-- Download Button -->
+    <div class="flex items-center justify-center">
+        <button
+            @click="downloadTableAsCSV"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-md transition duration-200"
+        >
+            Download as CSV
+        </button>
+    </div>
+    <!-- Highest and Lowest Days -->
+    <div class="flex-1">
+        <div v-if="highestAndLowestDays.highest && highestAndLowestDays.lowest" class="flex flex-col gap-4 text-lg">
+            <p>
+                Highest Day:
+                <span class="font-bold">{{ highestAndLowestDays.highest.date }} (£{{ highestAndLowestDays.highest.value }})</span>
+            </p>
+            <p>
+                Lowest Day:
+                <span class="font-bold">{{ highestAndLowestDays.lowest.date }} (£{{ highestAndLowestDays.lowest.value }})</span>
+            </p>
+        </div>
+        <div v-else class="text-lg text-gray-400">
+            No data available for highest/lowest days.
+        </div>
+    </div>
+</div>
             <div v-if="flattenedRows.length === 0" class="text-gray-400">
                 No manifests available for this period.
             </div>
@@ -519,7 +614,7 @@ function getRoundName(roundId: string): string {
                                     <span
                                         class="absolute hidden group-hover:block bg-gray-600 text-white text-xs rounded py-1 px-2 -mt-8 left-1/2 transform -translate-x-1/2">
                                         Value: £{{ (row.manifest.quantities.find(q => q.parcel_type_id ===
-                                        type.id)?.value ?? 0).toFixed(2) }}
+                                            type.id)?.value ?? 0).toFixed(2) }}
                                     </span>
                                 </span>
                             </td>
