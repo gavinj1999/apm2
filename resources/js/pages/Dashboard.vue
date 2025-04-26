@@ -69,7 +69,7 @@ const { groupedManifests, currentPeriodEarnings = 0, averageDailyIncome = 0, rem
 }>();
 
 // Log debug values to console
-console.log('Debug Values:', debug);
+//console.log('Debug Values:', debug);
 
 // Default delivery date (today)
 const now = new Date();
@@ -246,9 +246,39 @@ function formatDate(dateStr: string): string {
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
 }
+
+// Compute footer totals
+const footerTotals = computed(() => {
+    const totals: { [key: number]: number } = {};
+    let totalValueSum = 0;
+
+    // Initialize totals for each parcel type
+    parcelTypes.forEach(type => {
+        totals[type.id] = 0;
+    });
+
+    // Sum up totals for each manifest
+    flattenedRows.value.forEach(row => {
+        row.manifest.quantities.forEach(quantity => {
+            totals[quantity.parcel_type_id] += quantity.total || 0;
+        });
+        totalValueSum += row.manifest.total_value || 0;
+    });
+
+    return {
+        parcelTypeTotals: totals,
+        totalValueSum,
+    };
+});
+
+function getRoundName(roundId: string): string {
+    const round = rounds.find(r => r.id === Number(roundId));
+    return round ? round.name : 'Unknown Round';
+}
 </script>
 
 <template>
+
     <Head title="Dashboard" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
@@ -262,26 +292,29 @@ function formatDate(dateStr: string): string {
             </div>
 
             <!-- Debug Information -->
-            <div class="mb-6 p-4 bg-gray-700 rounded-lg">
+            <div class="mb-6 p-4 bg-gray-700 rounded-lg hidden">
                 <h3 class="text-lg font-semibold mb-2">Debug Information</h3>
                 <p>User ID: {{ debug.user_id ?? 'N/A' }}</p>
                 <p>Round IDs: {{ debug.roundIds?.join(', ') ?? 'N/A' }}</p>
                 <p>Parcel Types Count: {{ debug.parcelTypesCount ?? 'N/A' }}</p>
                 <p>Manifests Count: {{ debug.manifestsCount ?? 'N/A' }}</p>
-                <p>Periods: {{ debug.periods ? debug.periods.map(p => `${p.name}: ${p.start_date} to ${p.end_date}`).join('; ') : 'N/A' }}</p>
+                <p>Periods: {{ debug.periods ? debug.periods.map(p => `${p.name}: ${p.start_date} to
+                    ${p.end_date}`).join('; ') : 'N/A' }}</p>
                 <p>Current Date: {{ debug.currentDate ?? 'N/A' }}</p>
                 <p>Current Period Name: {{ debug.currentPeriodName ?? 'N/A' }}</p>
                 <p>Current Period Start: {{ debug.currentPeriodStart ?? 'N/A' }}</p>
                 <p>Current Period End: {{ debug.currentPeriodEnd ?? 'N/A' }}</p>
                 <p>Manifest Count in Period: {{ debug.manifestCount ?? 'N/A' }}</p>
                 <p>Manifest Dates in Period: {{ debug.manifestDates?.join(', ') ?? 'N/A' }}</p>
-                <p>Earnings Result: {{ debug.earningsResult ? `Days: ${debug.earningsResult.days_with_manifests}, Earnings: £${debug.earningsResult.total_earnings}` : 'N/A' }}</p>
+                <p>Earnings Result: {{ debug.earningsResult ? `Days: ${debug.earningsResult.days_with_manifests},
+                    Earnings: £${debug.earningsResult.total_earnings}` : 'N/A' }}</p>
                 <p v-if="debug.earningsQueryError">Earnings Query Error: {{ debug.earningsQueryError }}</p>
                 <p>Current Period Earnings: £{{ debug.currentPeriodEarnings?.toFixed(2) ?? 'N/A' }}</p>
                 <p>Days with Manifests: {{ debug.daysWithManifests ?? 'N/A' }}</p>
                 <p>Average Daily Income: £{{ debug.averageDailyIncome?.toFixed(2) ?? 'N/A' }}</p>
                 <p>Remaining Days: {{ debug.remainingDays ?? 'N/A' }}</p>
-                <p v-if="debug.remainingDaysQueryError">Remaining Days Query Error: {{ debug.remainingDaysQueryError }}</p>
+                <p v-if="debug.remainingDaysQueryError">Remaining Days Query Error: {{ debug.remainingDaysQueryError }}
+                </p>
                 <p v-if="debug.error">Error: {{ debug.error }}</p>
                 <p v-if="debug.errorTrace">Error Trace: {{ debug.errorTrace }}</p>
             </div>
@@ -294,39 +327,36 @@ function formatDate(dateStr: string): string {
                     <!-- Delivery Date -->
                     <div class="mb-6">
                         <label class="block text-sm font-medium mb-2">Delivery Date</label>
-                        <input
-                            v-model="manifestForm.delivery_date"
-                            type="date"
-                            class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        />
-                        <div v-if="manifestForm.errors.delivery_date" class="text-red-500 text-sm mt-1">{{ manifestForm.errors.delivery_date }}</div>
+                        <input v-model="manifestForm.delivery_date" type="date"
+                            class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base" />
+                        <div v-if="manifestForm.errors.delivery_date" class="text-red-500 text-sm mt-1">{{
+                            manifestForm.errors.delivery_date }}</div>
                     </div>
 
                     <!-- Status -->
                     <div class="mb-6">
                         <label class="block text-sm font-medium mb-2">Status</label>
-                        <select
-                            v-model="manifestForm.status"
-                            class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        >
+                        <select v-model="manifestForm.status"
+                            class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base">
                             <option value="pending">Pending</option>
                             <option value="in-progress">In-Progress</option>
                             <option value="completed">Completed</option>
                         </select>
-                        <div v-if="manifestForm.errors.status" class="text-red-500 text-sm mt-1">{{ manifestForm.errors.status }}</div>
+                        <div v-if="manifestForm.errors.status" class="text-red-500 text-sm mt-1">{{
+                            manifestForm.errors.status }}</div>
                     </div>
 
                     <!-- Round -->
                     <div class="mb-6">
                         <label class="block text-sm font-medium mb-2">Round</label>
-                        <select
-                            v-model="manifestForm.round_id"
-                            class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        >
+                        <select v-model="manifestForm.round_id"
+                            class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base">
                             <option value="" disabled>Select a round</option>
-                            <option v-for="round in rounds" :key="round.id" :value="round.id">{{ round.round_id }}</option>
+                            <option v-for="round in rounds" :key="round.id" :value="round.id">{{ round.round_id }}
+                            </option>
                         </select>
-                        <div v-if="manifestForm.errors.round_id" class="text-red-500 text-sm mt-1">{{ manifestForm.errors.round_id }}</div>
+                        <div v-if="manifestForm.errors.round_id" class="text-red-500 text-sm mt-1">{{
+                            manifestForm.errors.round_id }}</div>
                     </div>
 
                     <!-- Parcel Quantities Section -->
@@ -341,28 +371,24 @@ function formatDate(dateStr: string): string {
                                             <label class="block text-xs text-gray-400 mb-1">{{ manifestLabel }}</label>
                                             <input
                                                 v-model.number="manifestForm.quantities.find(q => q.parcel_type_id === type.id).manifested"
-                                                type="number"
-                                                min="0"
-                                                class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base h-12"
-                                            />
+                                                type="number" min="0"
+                                                class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base h-12" />
                                         </div>
                                         <div>
-                                            <label class="block text-xs text-gray-400 mb-1">{{ remanifestedLabel }}</label>
+                                            <label class="block text-xs text-gray-400 mb-1">{{ remanifestedLabel
+                                                }}</label>
                                             <input
                                                 v-model.number="manifestForm.quantities.find(q => q.parcel_type_id === type.id).re_manifested"
-                                                type="number"
-                                                min="0"
-                                                class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base h-12"
-                                            />
+                                                type="number" min="0"
+                                                class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base h-12" />
                                         </div>
                                         <div>
-                                            <label class="block text-xs text-gray-400 mb-1">{{ carriedForwardLabel }}</label>
+                                            <label class="block text-xs text-gray-400 mb-1">{{ carriedForwardLabel
+                                                }}</label>
                                             <input
                                                 v-model.number="manifestForm.quantities.find(q => q.parcel_type_id === type.id).carried_forward"
-                                                type="number"
-                                                min="0"
-                                                class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base h-12"
-                                            />
+                                                type="number" min="0"
+                                                class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base h-12" />
                                         </div>
                                     </div>
                                 </div>
@@ -375,28 +401,24 @@ function formatDate(dateStr: string): string {
                                             <label class="block text-xs text-gray-400 mb-1">{{ manifestLabel }}</label>
                                             <input
                                                 v-model.number="manifestForm.quantities.find(q => q.parcel_type_id === type.id).manifested"
-                                                type="number"
-                                                min="0"
-                                                class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base h-12"
-                                            />
+                                                type="number" min="0"
+                                                class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base h-12" />
                                         </div>
                                         <div>
-                                            <label class="block text-xs text-gray-400 mb-1">{{ remanifestedLabel }}</label>
+                                            <label class="block text-xs text-gray-400 mb-1">{{ remanifestedLabel
+                                                }}</label>
                                             <input
                                                 v-model.number="manifestForm.quantities.find(q => q.parcel_type_id === type.id).re_manifested"
-                                                type="number"
-                                                min="0"
-                                                class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base h-12"
-                                            />
+                                                type="number" min="0"
+                                                class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base h-12" />
                                         </div>
                                         <div>
-                                            <label class="block text-xs text-gray-400 mb-1">{{ carriedForwardLabel }}</label>
+                                            <label class="block text-xs text-gray-400 mb-1">{{ carriedForwardLabel
+                                                }}</label>
                                             <input
                                                 v-model.number="manifestForm.quantities.find(q => q.parcel_type_id === type.id).carried_forward"
-                                                type="number"
-                                                min="0"
-                                                class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base h-12"
-                                            />
+                                                type="number" min="0"
+                                                class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base h-12" />
                                         </div>
                                     </div>
                                 </div>
@@ -424,18 +446,12 @@ function formatDate(dateStr: string): string {
 
                     <!-- Buttons -->
                     <div class="flex flex-col sm:flex-row gap-3">
-                        <button
-                            type="submit"
-                            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-md transition duration-200 w-full sm:w-auto"
-                        >
+                        <button type="submit"
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-md transition duration-200 w-full sm:w-auto">
                             {{ isEditMode ? 'Update Manifest' : 'Create Manifest' }}
                         </button>
-                        <button
-                            v-if="isEditMode"
-                            type="button"
-                            @click="cancelEdit"
-                            class="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-6 py-3 rounded-md transition duration-200 w-full sm:w-auto"
-                        >
+                        <button v-if="isEditMode" type="button" @click="cancelEdit"
+                            class="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-6 py-3 rounded-md transition duration-200 w-full sm:w-auto">
                             Cancel
                         </button>
                     </div>
@@ -445,11 +461,9 @@ function formatDate(dateStr: string): string {
             <!-- Period Selection -->
             <div class="mb-6">
                 <label class="block text-sm font-medium mb-2">Select Period</label>
-                <select
-                    v-model="selectedPeriod"
+                <select v-model="selectedPeriod"
                     class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                    :disabled="availablePeriods.length === 0"
-                >
+                    :disabled="availablePeriods.length === 0">
                     <option v-if="availablePeriods.length === 0" disabled>No periods available</option>
                     <option v-for="period in availablePeriods" :key="period" :value="period">
                         {{ period }}
@@ -484,24 +498,28 @@ function formatDate(dateStr: string): string {
                         <tr class="bg-gray-700">
                             <th class="p-3 text-left text-sm font-medium">Date</th>
                             <th class="p-3 text-left text-sm font-medium">Round</th>
-                            <th v-for="type in parcelTypes" :key="type.id" class="p-3 text-left text-sm font-medium">{{ type.name }}</th>
+                            <th v-for="type in parcelTypes" :key="type.id" class="p-3 text-left text-sm font-medium">{{
+                                type.name }}</th>
                             <th class="p-3 text-left text-sm font-medium">Total Value</th>
                             <th class="p-3 text-left text-sm font-medium">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="(row, index) in flattenedRows" :key="row.manifest.id" class="border-b border-gray-600">
+                        <tr v-for="(row, index) in flattenedRows" :key="row.manifest.id"
+                            class="border-b border-gray-600">
                             <td v-if="row.isFirstInDate" :rowspan="row.dateRowspan" class="p-3">
                                 {{ formatDate(row.date) }}
                             </td>
                             <td class="p-3">
-                                {{ row.manifest.round_id }}
+                                {{ getRoundName(row.manifest.round_id) }}
                             </td>
                             <td v-for="type in parcelTypes" :key="type.id" class="p-3 relative group">
                                 <span class="cursor-pointer">
                                     {{ row.manifest.quantities.find(q => q.parcel_type_id === type.id)?.total ?? 0 }}
-                                    <span class="absolute hidden group-hover:block bg-gray-600 text-white text-xs rounded py-1 px-2 -mt-8 left-1/2 transform -translate-x-1/2">
-                                        Value: £{{ (row.manifest.quantities.find(q => q.parcel_type_id === type.id)?.value ?? 0).toFixed(2) }}
+                                    <span
+                                        class="absolute hidden group-hover:block bg-gray-600 text-white text-xs rounded py-1 px-2 -mt-8 left-1/2 transform -translate-x-1/2">
+                                        Value: £{{ (row.manifest.quantities.find(q => q.parcel_type_id ===
+                                        type.id)?.value ?? 0).toFixed(2) }}
                                     </span>
                                 </span>
                             </td>
@@ -509,21 +527,28 @@ function formatDate(dateStr: string): string {
                                 £{{ (row.manifest.total_value || 0).toFixed(2) }}
                             </td>
                             <td class="p-3 flex gap-1">
-                                <button
-                                    @click="editManifest(row.manifest.id)"
-                                    class="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold px-2 py-0.5 rounded-md text-xs"
-                                >
+                                <button @click="editManifest(row.manifest.id)"
+                                    class="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold px-2 py-0.5 rounded-md text-xs">
                                     Edit
                                 </button>
-                                <button
-                                    @click="deleteManifest(row.manifest.id, row.manifest.delivery_date)"
-                                    class="bg-red-600 hover:bg-red-700 text-white font-semibold px-2 py-0.5 rounded-md text-xs"
-                                >
+                                <button @click="deleteManifest(row.manifest.id, row.manifest.delivery_date)"
+                                    class="bg-red-600 hover:bg-red-700 text-white font-semibold px-2 py-0.5 rounded-md text-xs">
                                     Delete
                                 </button>
                             </td>
                         </tr>
                     </tbody>
+                    <tfoot>
+                        <tr class="bg-gray-700 font-bold">
+                            <td class="p-3">Total</td>
+                            <td class="p-3"></td> <!-- Empty cell for Round column -->
+                            <td v-for="type in parcelTypes" :key="type.id" class="p-3">
+                                {{ footerTotals.parcelTypeTotals[type.id] || 0 }}
+                            </td>
+                            <td class="p-3">£{{ footerTotals.totalValueSum.toFixed(2) }}</td>
+                            <td class="p-3"></td> <!-- Empty cell for Actions column -->
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
         </div>
@@ -540,13 +565,14 @@ td {
         font-size: 1rem;
     }
 
-    input, select {
+    input,
+    select {
         font-size: 1rem;
         padding: 0.75rem;
         height: 3rem;
     }
 
-    .grid-cols-4 > div {
+    .grid-cols-4>div {
         font-size: 0.875rem;
         padding: 0.5rem 0;
     }
