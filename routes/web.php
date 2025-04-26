@@ -6,6 +6,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ManifestController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\RoundPricingController;
+use App\Http\Controllers\NMWCalculatorController;
 
 use Inertia\Inertia;
 
@@ -31,6 +32,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/prices', [RoundPricingController::class, 'store'])->name('prices.store');
     Route::put('/prices/{id}', [RoundPricingController::class, 'update'])->name('prices.update');
     Route::delete('/prices/{id}', [RoundPricingController::class, 'destroy'])->name('prices.destroy');
+
+    Route::get('/nmw-calculator', [NMWCalculatorController::class, 'index'])->middleware('auth')->name('calculator.index');
 });
 
 Route::middleware(['auth'])->group(function () {
