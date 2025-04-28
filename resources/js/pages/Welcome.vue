@@ -80,7 +80,7 @@ const fetchTraffic = async () => {
   if (!location.value) return;
   try {
     const response = await axios.get('/api/traffic', {
-      params: { lat: location.value.lat, lon: location.value.lon, radius: 16093 },
+      params: { lat: location.value.lat, lon: location.value.lon, radius: 32000 },
     });
     console.log('Traffic API response:', response.data); // Debug log
     traffic.value = response.data.incidents || [];
@@ -95,7 +95,7 @@ const initMap = () => {
   if (!mapContainer.value || !location.value) return;
 
   // Initialize map
-  map = L.map(mapContainer.value).setView([location.value.lat, location.value.lon], 10);
+  map = L.map(mapContainer.value).setView([location.value.lat, location.value.lon], 12);
 
   // Add base tile layer (OpenStreetMap)
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

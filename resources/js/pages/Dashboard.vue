@@ -242,7 +242,7 @@ function getTotals(form: any) {
 
 // Split parcel types into two columns for desktop (4 per column)
 const leftColumnTypes = parcelTypes.slice(0, 4);
-const rightColumnTypes = parcelTypes.slice(4, 8);
+const rightColumnTypes = parcelTypes.slice(4, 9);
 
 const manifestLabel = "M";
 const remanifestedLabel = "R";
@@ -503,6 +503,7 @@ const isProcessing = ref(false);
                                                 type="number" min="0"
                                                 class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base h-12" />
                                         </div>
+
                                     </div>
                                 </div>
                             </div>
