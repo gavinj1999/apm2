@@ -142,31 +142,42 @@ const manifestForm = useForm({
     })),
 });
 
-// Submit function (handles both create and update)
+// Update submitManifest to display errors
 function submitManifest() {
-    console.log('submitManifest called', manifestForm.data());
-    isProcessing.value = true; // Indicate form is processing
+    if (!manifestForm.round_id) {
+        alert('Please select a round.');
+        isProcessing.value = false;
+        return;
+    }
+    console.log('Submitting form', manifestForm.data());
+    isProcessing.value = true;
 
     if (isEditMode.value && editingManifestId.value) {
-        manifestForm.put(route('manifests.update-by-id', editingManifestId.value), {
+        manifestForm.put(route('manifests.update', editingManifestId.value), {
             onSuccess: () => {
+                console.log('Update success');
                 isEditMode.value = false;
                 editingManifestId.value = null;
                 manifestForm.reset();
-                isProcessing.value = false; // Form processing complete
+                isProcessing.value = false;
             },
-            onError: () => {
-                isProcessing.value = false; // Form processing complete, even on error
+            onError: (errors) => {
+                console.error('Update error', errors);
+                isProcessing.value = false;
+                alert('Failed to update manifest: ' + JSON.stringify(errors));
             },
         });
     } else {
         manifestForm.post(route('manifests.store'), {
             onSuccess: () => {
+                console.log('Create success');
                 manifestForm.reset();
-                isProcessing.value = false; // Form processing complete
+                isProcessing.value = false;
             },
-            onError: () => {
-                isProcessing.value = false; // Form processing complete, even on error
+            onError: (errors) => {
+                console.error('Create error', errors);
+                isProcessing.value = false;
+                alert('Failed to create manifest: ' + JSON.stringify(errors));
             },
         });
     }
@@ -366,8 +377,8 @@ const isProcessing = ref(false);
         <div class="p-6 bg-gray-900 min-h-screen text-white">
             <!-- Flash Messages -->
             <div v-if="isProcessing" class="mb-4 p-4 bg-yellow-600 text-white rounded-lg">
-            Processing {{ isEditMode ? 'update' : 'creation' }} of manifest...
-        </div>
+                Processing {{ isEditMode ? 'update' : 'creation' }} of manifest...
+            </div>
             <div v-if="flash?.success" class="mb-4 p-4 bg-green-600 text-white rounded-lg">
                 {{ flash.success }}
             </div>
@@ -413,8 +424,18 @@ const isProcessing = ref(false);
                         <label class="block text-sm font-medium mb-2">Delivery Date</label>
                         <input v-model="manifestForm.delivery_date" type="date"
                             class="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base" />
-                        <div v-if="manifestForm.errors.delivery_date" class="text-red-500 text-sm mt-1">{{
-                            manifestForm.errors.delivery_date }}</div>
+                        <div v-if="manifestForm.errors.delivery_date" class="text-red-500 text-sm mt-1">
+                            {{ manifestForm.errors.delivery_date }}
+                        </div>
+                        <div v-if="manifestForm.errors.round_id" class="text-red-500 text-sm mt-1">
+                            {{ manifestForm.errors.round_id }}
+                        </div>
+                        <div v-for="(error, key) in manifestForm.errors" :key="key" class="text-red-500 text-sm mt-1">
+                            {{ error }}
+                        </div>
+                        <div v-if="flash?.error" class="mb-4 p-4 bg-red-600 text-white rounded-lg">
+                            {{ flash.error }}
+                        </div>
                     </div>
 
                     <!-- Status -->
@@ -517,13 +538,13 @@ const isProcessing = ref(false);
                                     <label>Total</label>
                                 </div>
                                 <div>
-                                    <label>Man:  {{ getTotals(manifestForm).manifested }}</label>
+                                    <label>Man: {{ getTotals(manifestForm).manifested }}</label>
                                 </div>
                                 <div>
-                                    <label>ReMan:  {{ getTotals(manifestForm).re_manifested }}</label>
+                                    <label>ReMan: {{ getTotals(manifestForm).re_manifested }}</label>
                                 </div>
                                 <div>
-                                    <label>CFWD:  {{ getTotals(manifestForm).carried_forward }}</label>
+                                    <label>CFWD: {{ getTotals(manifestForm).carried_forward }}</label>
                                 </div>
                             </div>
                         </div>
@@ -556,52 +577,53 @@ const isProcessing = ref(false);
                 </select>
             </div>
 
-<!-- Current Period Summary -->
-<h2 class="text-xl font-semibold mb-4">{{ currentPeriod }} Summary</h2>
-<div class="mb-6 p-4 bg-gray-700 rounded-lg flex flex-col md:flex-row gap-4">
-    <!-- Summary Content -->
-    <div class="flex-1">
-        <div class="flex flex-col gap-4 text-lg">
-            <p>
-                Total Earnings:
-                <span class="font-bold">£{{ currentPeriodEarnings.toFixed(2) }}</span>
-            </p>
-            <p>
-                Average Daily Income:
-                <span class="font-bold">£{{ averageDailyIncome.toFixed(2) }}</span>
-            </p>
-            <p>
-                Days Remaining in Period:
-                <span class="font-bold">{{ remainingDays }}</span>
-            </p>
-        </div>
-    </div>
-    <!-- Download Button -->
-    <div class="flex items-center justify-center">
-        <button
-            @click="downloadTableAsCSV"
-            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-md transition duration-200"
-        >
-            Download as CSV
-        </button>
-    </div>
-    <!-- Highest and Lowest Days -->
-    <div class="flex-1">
-        <div v-if="highestAndLowestDays.highest && highestAndLowestDays.lowest" class="flex flex-col gap-4 text-lg">
-            <p>
-                Highest Day:
-                <span class="font-bold">{{ highestAndLowestDays.highest.date }} (£{{ highestAndLowestDays.highest.value }})</span>
-            </p>
-            <p>
-                Lowest Day:
-                <span class="font-bold">{{ highestAndLowestDays.lowest.date }} (£{{ highestAndLowestDays.lowest.value }})</span>
-            </p>
-        </div>
-        <div v-else class="text-lg text-gray-400">
-            No data available for highest/lowest days.
-        </div>
-    </div>
-</div>
+            <!-- Current Period Summary -->
+            <h2 class="text-xl font-semibold mb-4">{{ currentPeriod }} Summary</h2>
+            <div class="mb-6 p-4 bg-gray-700 rounded-lg flex flex-col md:flex-row gap-4">
+                <!-- Summary Content -->
+                <div class="flex-1">
+                    <div class="flex flex-col gap-4 text-lg">
+                        <p>
+                            Total Earnings:
+                            <span class="font-bold">£{{ currentPeriodEarnings.toFixed(2) }}</span>
+                        </p>
+                        <p>
+                            Average Daily Income:
+                            <span class="font-bold">£{{ averageDailyIncome.toFixed(2) }}</span>
+                        </p>
+                        <p>
+                            Days Remaining in Period:
+                            <span class="font-bold">{{ remainingDays }}</span>
+                        </p>
+                    </div>
+                </div>
+                <!-- Download Button -->
+                <div class="flex items-center justify-center">
+                    <button @click="downloadTableAsCSV"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-md transition duration-200">
+                        Download as CSV
+                    </button>
+                </div>
+                <!-- Highest and Lowest Days -->
+                <div class="flex-1">
+                    <div v-if="highestAndLowestDays.highest && highestAndLowestDays.lowest"
+                        class="flex flex-col gap-4 text-lg">
+                        <p>
+                            Highest Day:
+                            <span class="font-bold">{{ highestAndLowestDays.highest.date }} (£{{
+                                highestAndLowestDays.highest.value }})</span>
+                        </p>
+                        <p>
+                            Lowest Day:
+                            <span class="font-bold">{{ highestAndLowestDays.lowest.date }} (£{{
+                                highestAndLowestDays.lowest.value }})</span>
+                        </p>
+                    </div>
+                    <div v-else class="text-lg text-gray-400">
+                        No data available for highest/lowest days.
+                    </div>
+                </div>
+            </div>
             <div v-if="flattenedRows.length === 0" class="text-gray-400">
                 No manifests available for this period.
             </div>
