@@ -144,6 +144,7 @@ const manifestForm = useForm({
 
 // Submit function (handles both create and update)
 function submitManifest() {
+    console.log('submitManifest called', manifestForm.data());
     isProcessing.value = true; // Indicate form is processing
 
     if (isEditMode.value && editingManifestId.value) {
@@ -516,13 +517,13 @@ const isProcessing = ref(false);
                                     <label>Total</label>
                                 </div>
                                 <div>
-                                    <label>Man: {{ getTotals(manifestForm).manifested }}</label>
+                                    <label>Man:  {{ getTotals(manifestForm).manifested }}</label>
                                 </div>
                                 <div>
-                                    <label>ReMan: {{ getTotals(manifestForm).re_manifested }}</label>
+                                    <label>ReMan:  {{ getTotals(manifestForm).re_manifested }}</label>
                                 </div>
                                 <div>
-                                    <label>CFWD: {{ getTotals(manifestForm).carried_forward }}</label>
+                                    <label>CFWD:  {{ getTotals(manifestForm).carried_forward }}</label>
                                 </div>
                             </div>
                         </div>

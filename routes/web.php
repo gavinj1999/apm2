@@ -18,33 +18,29 @@ Route::get('/', function () {
 
 Route::middleware('auth')->group(function () {
     Route::resource('periods', PeriodController::class)->except(['show']);
-    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
-});
 
-Route::middleware(['auth'])->group(function () {
-    Route::get('/dashboard', [ManifestController::class, 'index'])->middleware('auth')->name('dashboard');
-    Route::post('/manifests', [ManifestController::class, 'store'])->middleware('auth')->name('manifests.store');
-    Route::get('/manifests/{id}', [ManifestController::class, 'show'])->middleware('auth')->name('manifests.show');
-    Route::put('/manifests/{id}', [ManifestController::class, 'update'])->middleware('auth')->name('manifests.update-by-id');
-    Route::delete('/manifests/{id}', [ManifestController::class, 'destroy'])->middleware('auth')->name('manifests.destroy');
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+
+    Route::get('/dashboard', [ManifestController::class, 'index'])->name('dashboard');
+
+    Route::post('/manifests', [ManifestController::class, 'store'])->name('manifests.store');
+    Route::get('/manifests/{id}', [ManifestController::class, 'show'])->name('manifests.show');
+    Route::put('/manifests/{id}', [ManifestController::class, 'update'])->name('manifests.update-by-id');
+    Route::delete('/manifests/{id}', [ManifestController::class, 'destroy'])->name('manifests.destroy');
+    Route::get('/manifests', [ManifestController::class, 'index'])->name('manifests.index');
+    Route::get('/manifests/create', [ManifestController::class, 'create'])->name('manifests.create');
+
 
     Route::get('/prices', [RoundPricingController::class, 'index'])->name('prices.index');
     Route::post('/prices', [RoundPricingController::class, 'store'])->name('prices.store');
     Route::put('/prices/{id}', [RoundPricingController::class, 'update'])->name('prices.update');
     Route::delete('/prices/{id}', [RoundPricingController::class, 'destroy'])->name('prices.destroy');
 
-    Route::get('/nmw-calculator', [NMWCalculatorController::class, 'index'])->middleware('auth')->name('calculator.index');
+    Route::get('/nmw-calculator', [NMWCalculatorController::class, 'index'])->name('calculator.index');
+
+
 });
 
-Route::middleware(['auth'])->group(function () {
-    Route::get('/manifests', [ManifestController::class, 'index'])->name('manifests.index');
-    Route::get('/manifests/create', [ManifestController::class, 'create'])->name('manifests.create');
-    Route::post('/manifests', [ManifestController::class, 'store'])->name('manifests.store');
-});
-
-
-
-//Route::middleware(['auth'])->get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
 
 require __DIR__ . '/settings.php';
