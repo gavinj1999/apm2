@@ -7,140 +7,232 @@ use App\Models\Period;
 use App\Models\Round;
 use App\Models\ParcelType;
 use Inertia\Inertia;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
     public function index()
-    {
-        // Fetch all parcel types
-        $parcelTypes = ParcelType::orderBy('sort_order')->get();
+{
+    $debug = [];
 
-        // Fetch rounds for the authenticated user
-        $rounds = Round::where('user_id', auth()->id())->get();
+    try {
+        $user = auth()->user();
+        $debug['user_id'] = $user->id;
 
-        // Fetch all periods
-        $periods = Period::all();
+        $rounds = Round::where('user_id', $user->id)->get();
+        $roundIds = $rounds->pluck('id')->toArray();
+        $debug['roundIds'] = $roundIds;
 
-        // Fetch individual manifests with their rounds and summaries
-        $manifests = Manifest::with(['round', 'summaries.parcel_type'])
-            ->where('user_id', auth()->id())
-            ->orderBy('delivery_date', 'desc')
-            ->orderBy('round_id', 'asc')
-            ->get()
-            ->map(function ($manifest) use ($parcelTypes) {
-                // Debug: Log manifest and round data
-                \Log::info('Manifest data:', [
-                    'manifest_id' => $manifest->id,
-                    'round_id' => $manifest->round_id,
-                    'round_exists' => !is_null($manifest->round),
-                ]);
+        $parcelTypes = ParcelType::all();
+        $debug['parcelTypesCount'] = $parcelTypes->count();
 
-                if (is_null($manifest->round)) {
-                    // Skip this manifest if the round is missing
-                    return null;
+        $manifests = Manifest::whereIn('round_id', $roundIds)
+            ->with(['round', 'quantities'])
+            ->get();
+        $debug['manifestsCount'] = $manifests->count();
+
+        $periods = Period::orderBy('start_date', 'desc')->get();
+        $debug['periods'] = $periods->toArray();
+
+        $groupedManifests = $manifests->groupBy(function ($manifest) use ($periods) {
+            $manifestDate = Carbon::parse($manifest->delivery_date);
+            foreach ($periods as $period) {
+                $startDate = Carbon::parse($period->start_date);
+                $endDate = Carbon::parse($period->end_date);
+                if ($manifestDate->between($startDate, $endDate)) {
+                    return $period->name;
                 }
+            }
+            return 'Unassigned';
+        })->map(function ($group, $periodName) use ($rounds, $parcelTypes) {
+            $byDate = $group->groupBy('delivery_date')->map(function ($dateGroup, $date) use ($rounds, $parcelTypes) {
+                $byRound = $dateGroup->groupBy('round_id')->map(function ($roundGroup, $roundId) use ($rounds, $parcelTypes, $date) {
+                    $quantities = $parcelTypes->map(function ($type) use ($roundGroup) {
+                        $totalManifested = 0;
+                        $totalReManifested = 0;
+                        $totalCarriedForward = 0;
 
-                // Aggregate quantities for each parcel type
-                $quantities = $parcelTypes->map(function ($type) use ($manifest) {
-                    $summary = $manifest->summaries->firstWhere('parcel_type_id', $type->id);
-                    // Debug: Log roundPricings data
-                    \Log::info('RoundPricings data for manifest:', [
-                        'manifest_id' => $manifest->id,
-                        'round_id' => $manifest->round->id,
-                        'roundPricings' => $manifest->round->roundPricings ? $manifest->round->roundPricings->toArray() : null,
-                    ]);
-                    $roundPricing = $manifest->round->roundPricings ? $manifest->round->roundPricings->firstWhere('parcel_type_id', $type->id) : null;
-                    $price = $roundPricing ? $roundPricing->price : 0;
-                    $manifested = $summary ? $summary->manifested : 0;
-                    $value = $price * $manifested;
+                        try {
+                            $totalManifested = $roundGroup->sum(function ($manifest) use ($type) {
+                                return $manifest->quantities->where('parcel_type_id', $type->id)->sum('manifested') ?? 0;
+                            });
+                            $totalReManifested = $roundGroup->sum(function ($manifest) use ($type) {
+                                return $manifest->quantities->where('parcel_type_id', $type->id)->sum('re_manifested') ?? 0;
+                            });
+                            $totalCarriedForward = $roundGroup->sum(function ($manifest) use ($type) {
+                                return $manifest->quantities->where('parcel_type_id', $type->id)->sum('carried_forward') ?? 0;
+                            });
+                        } catch (\Exception $e) {
+                            // Silent catch
+                        }
+
+                        $total = $totalManifested + $totalReManifested + $totalCarriedForward;
+
+                        $price = DB::table('round_pricings')
+                            ->where('round_id', $roundGroup->first()->round_id)
+                            ->where('parcel_type_id', $type->id)
+                            ->value('price') ?? 0;
+
+                        return [
+                            'parcel_type_id' => $type->id,
+                            'name' => $type->name,
+                            'manifested' => $totalManifested,
+                            're_manifested' => $totalReManifested,
+                            'carried_forward' => $totalCarriedForward,
+                            'total' => $total,
+                            'value' => $total * $price,
+                        ];
+                    });
+
+                    $totalValue = $quantities->sum('value');
+
+                    // Find the round name from the rounds collection
+                    $round = $rounds->firstWhere('id', $roundId);
 
                     return [
-                        'parcel_type_id' => $type->id,
-                        'name' => $type->name,
-                        'manifested' => $manifested,
-                        're_manifested' => $summary ? $summary->re_manifested : 0,
-                        'carried_forward' => $summary ? $summary->carried_forward : 0,
-                        'total' => $summary ? ($summary->manifested + $summary->re_manifested + $summary->carried_forward) : 0,
-                        'value' => $value,
+                        'id' => $roundGroup->first()->id,
+                        'manifest_number' => $roundGroup->first()->manifest_number,
+                        'delivery_date' => $date,
+                        'round_id' => $roundId,
+                        'round_name' => $round ? $round->round_id : 'Unknown Round',
+                        'quantities' => $quantities->toArray(),
+                        'total_value' => $totalValue,
                     ];
-                });
-
-                // Calculate total monetary value for the manifest
-                $totalValue = $manifest->summaries->reduce(function ($total, $summary) use ($manifest) {
-                    $roundPricing = $manifest->round->roundPricings ? $manifest->round->roundPricings->firstWhere('parcel_type_id', $summary->parcel_type_id) : null;
-                    $price = $roundPricing ? $roundPricing->price : 0;
-                    return $total + ($price * $summary->manifested);
-                }, 0);
-
-                return [
-                    'id' => $manifest->id,
-                    'delivery_date' => $manifest->delivery_date,
-                    'round_id' => $manifest->round->round_id,
-                    'quantities' => $quantities,
-                    'total_value' => $totalValue,
-                ];
-            })
-            ->filter(); // Remove null values (manifests with missing rounds)
-
-        // Group manifests by period, then by date, then by round
-        $groupedManifests = $periods->map(function ($period) use ($manifests) {
-            $periodManifests = $manifests->filter(function ($manifest) use ($period) {
-                $deliveryDate = \Carbon\Carbon::parse($manifest['delivery_date']);
-                return $deliveryDate->between($period->start_date, $period->end_date);
-            });
-
-            // Skip this period if there are no manifests
-            if ($periodManifests->isEmpty()) {
-                return null;
-            }
-
-            // Group by date
-            $byDate = $periodManifests->groupBy('delivery_date')->map(function ($dateManifests) {
-                // Group by round within each date
-                $byRound = $dateManifests->groupBy('round_id')->map(function ($roundManifests) {
-                    return $roundManifests->first();
                 })->values();
 
                 return [
-                    'date' => $dateManifests->first()['delivery_date'],
-                    'manifests' => $byRound,
+                    'date' => $date,
+                    'manifests' => $byRound->toArray(),
                 ];
-            })->values();
+            })->sortByDesc('date')->values();
 
             return [
-                'period_name' => $period->name,
-                'dates' => $byDate,
+                'period_name' => $periodName,
+                'dates' => $byDate->toArray(),
             ];
-        })->filter()->values();
+        })->sortByDesc('period_name')->values();
 
-        // Calculate total earnings across all manifests
-        $totalEarnings = Manifest::with(['round.roundPricings', 'summaries'])
-            ->where('user_id', auth()->id())
-            ->get()
-            ->sum(function ($manifest) {
-                // Debug: Log manifest and round data for total earnings
-                \Log::info('Total earnings manifest data:', [
-                    'manifest_id' => $manifest->id,
-                    'round_id' => $manifest->round_id,
-                    'round_exists' => !is_null($manifest->round),
-                ]);
+        $currentDate = Carbon::today();
+        $debug['currentDate'] = $currentDate->toDateString();
 
-                if (is_null($manifest->round)) {
-                    return 0; // Skip this manifest if the round is missing
-                }
+        // Select the most recent period if the current date isn't in any period
+        $currentPeriod = null;
+        foreach ($periods as $period) {
+            $startDate = Carbon::parse($period->start_date);
+            $endDate = Carbon::parse($period->end_date);
+            if ($currentDate->between($startDate, $endDate)) {
+                $currentPeriod = $period;
+                break;
+            }
+        }
 
-                return $manifest->summaries->reduce(function ($total, $summary) use ($manifest) {
-                    $roundPricing = $manifest->round->roundPricings ? $manifest->round->roundPricings->firstWhere('parcel_type_id', $summary->parcel_type_id) : null;
-                    $price = $roundPricing ? $roundPricing->price : 0;
-                    return $total + ($price * $summary->manifested);
-                }, 0);
-            });
+        if (!$currentPeriod) {
+            // Fallback to the most recent period
+            $currentPeriod = $periods->first();
+            if ($currentPeriod) {
+                $currentPeriodName = $currentPeriod->name;
+                $currentPeriodStart = Carbon::parse($currentPeriod->start_date);
+                $currentPeriodEnd = Carbon::parse($currentPeriod->end_date);
+            } else {
+                $currentPeriodName = 'Unknown Period';
+                $currentPeriodStart = $currentDate->copy()->subDays(30); // Default to last 30 days
+                $currentPeriodEnd = $currentDate;
+            }
+        } else {
+            $currentPeriodName = $currentPeriod->name;
+            $currentPeriodStart = Carbon::parse($currentPeriod->start_date);
+            $currentPeriodEnd = Carbon::parse($currentPeriod->end_date);
+        }
+
+        $debug['currentPeriodName'] = $currentPeriodName;
+        $debug['currentPeriodStart'] = $currentPeriodStart->toDateString();
+        $debug['currentPeriodEnd'] = $currentPeriodEnd->toDateString();
+
+        $currentPeriodManifests = $manifests->filter(function ($manifest) use ($currentPeriodStart, $currentPeriodEnd) {
+            $manifestDate = Carbon::parse($manifest->delivery_date);
+            return $manifestDate->between($currentPeriodStart, $currentPeriodEnd);
+        });
+
+        $debug['manifestCount'] = $currentPeriodManifests->count();
+        $debug['manifestDates'] = $currentPeriodManifests->pluck('delivery_date')->toArray();
+
+        try {
+            $earningsResult = DB::selectOne("
+                SELECT
+                    COUNT(DISTINCT m.delivery_date) AS days_with_manifests,
+                    SUM(
+                        (ms.manifested + ms.re_manifested + ms.carried_forward) *
+                        COALESCE(rp.price, 0)
+                    ) AS total_earnings
+                FROM manifests m
+                LEFT JOIN manifest_summaries ms ON m.id = ms.manifest_id
+                LEFT JOIN round_pricings rp
+                    ON m.round_id = rp.round_id
+                    AND ms.parcel_type_id = rp.parcel_type_id
+                WHERE m.delivery_date BETWEEN ? AND ?
+                AND m.round_id IN (SELECT id FROM rounds WHERE user_id = ?)
+            ", [$currentPeriodStart, $currentPeriodEnd, $user->id]);
+
+            $debug['earningsResult'] = (array) $earningsResult;
+        } catch (\Exception $e) {
+            $debug['earningsQueryError'] = $e->getMessage();
+            $earningsResult = null;
+        }
+
+        $currentPeriodEarnings = (float) ($earningsResult->total_earnings ?? 0.0);
+        $daysWithManifests = (int) ($earningsResult->days_with_manifests ?? 0);
+        $averageDailyIncome = $daysWithManifests > 0 ? (float) ($currentPeriodEarnings / $daysWithManifests) : 0.0;
+
+        $debug['currentPeriodEarnings'] = $currentPeriodEarnings;
+        $debug['daysWithManifests'] = $daysWithManifests;
+        $debug['averageDailyIncome'] = $averageDailyIncome;
+
+        try {
+            $remainingDaysResult = DB::selectOne("
+                SELECT
+                    GREATEST(
+                        DATEDIFF(
+                            ?,
+                            ?
+                        ),
+                        0
+                    ) AS days_remaining
+            ", [$currentPeriodEnd->toDateString(), $currentDate->toDateString()]);
+
+            $remainingDays = $remainingDaysResult ? (int) $remainingDaysResult->days_remaining : 0;
+            $debug['remainingDays'] = $remainingDays;
+        } catch (\Exception $e) {
+            $debug['remainingDaysQueryError'] = $e->getMessage();
+            $remainingDays = 0;
+        }
 
         return Inertia::render('Dashboard', [
-            'groupedManifests' => $groupedManifests,
-            'totalEarnings' => $totalEarnings,
-            'rounds' => $rounds,
-            'parcelTypes' => $parcelTypes,
+            'groupedManifests' => $groupedManifests->toArray(),
+            'currentPeriodEarnings' => $currentPeriodEarnings,
+            'averageDailyIncome' => $averageDailyIncome,
+            'remainingDays' => $remainingDays,
+            'currentPeriod' => $currentPeriodName,
+            'rounds' => $rounds->toArray(),
+            'parcelTypes' => $parcelTypes->toArray(),
+            'flash' => session('flash', []),
+            'debug' => $debug,
+        ]);
+    } catch (\Exception $e) {
+        $debug['error'] = $e->getMessage();
+        $debug['errorTrace'] = $e->getTraceAsString();
+
+        return Inertia::render('Dashboard', [
+            'groupedManifests' => [],
+            'currentPeriodEarnings' => 0.0,
+            'averageDailyIncome' => 0.0,
+            'remainingDays' => 0,
+            'currentPeriod' => 'Error',
+            'rounds' => [],
+            'parcelTypes' => [],
+            'flash' => session('flash', []),
+            'debug' => $debug,
         ]);
     }
+}
 }

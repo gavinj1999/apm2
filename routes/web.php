@@ -21,11 +21,11 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 
-    Route::get('/dashboard', [ManifestController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::post('/manifests', [ManifestController::class, 'store'])->name('manifests.store');
     Route::get('/manifests/{id}', [ManifestController::class, 'show'])->name('manifests.show');
-    Route::put('/manifests/{id}', [ManifestController::class, 'update'])->name('manifests.update-by-id');
+    Route::put('/manifests/{id}', [ManifestController::class, 'update'])->name('manifests.update');
     Route::delete('/manifests/{id}', [ManifestController::class, 'destroy'])->name('manifests.destroy');
     Route::get('/manifests', [ManifestController::class, 'index'])->name('manifests.index');
     Route::get('/manifests/create', [ManifestController::class, 'create'])->name('manifests.create');
