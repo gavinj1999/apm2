@@ -155,7 +155,7 @@ defineExpose({ editManifest });
             Processing {{ isEditMode ? 'update' : 'creation' }} of manifest...
         </div>
 
-        <h2 class="text-xl font-semibold mb-4">{{ isEditMode ? 'Edit Manifest' : 'Create New Manifest' }}</h2>
+        <h2 class="text-xl font-semibold mb-4 p-2">{{ isEditMode ? 'Edit Manifest' : 'Create New Manifest' }}</h2>
         <form @submit.prevent="submitManifest" class="bg-gray-800 p-6 rounded-lg shadow-lg">
             <!-- Delivery Date -->
             <div class="mb-6">
