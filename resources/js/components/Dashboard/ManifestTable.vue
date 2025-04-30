@@ -77,7 +77,7 @@ const footerTotals = computed(() => {
 const holidaySummaries = computed(() => {
     return props.holidays.map(holiday => {
         const start = new Date(holiday.start_date);
-        const end = new Date(holiday.end_date);
+        const end = new Date(holiday.end_dateFloat);
         const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1; // Include both start and end dates
         const totalPayment = days * holiday.daily_rate;
         return {

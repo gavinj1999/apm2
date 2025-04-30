@@ -138,7 +138,7 @@ function getTotals(form: any) {
 
 // Split parcel types into two columns for desktop (4 per column)
 const leftColumnTypes = props.parcelTypes.slice(0, 4);
-const rightColumnTypes = props.parcelTypes.slice(4, 9);
+const rightColumnTypes = props.parcelTypes.slice(4, 8);
 
 const manifestLabel = "M";
 const remanifestedLabel = "R";

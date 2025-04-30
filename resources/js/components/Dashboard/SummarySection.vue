@@ -48,7 +48,7 @@ const totalHolidayPayments = computed(() => {
     return props.holidays.reduce((sum, holiday) => {
         const start = new Date(holiday.start_date);
         const end = new Date(holiday.end_date);
-        const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1; // Include both start and end dates
+        const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         const totalPayment = days * holiday.daily_rate;
         return sum + totalPayment;
     }, 0);
@@ -61,7 +61,6 @@ const totalEarnings = computed(() => {
 
 // Compute highest and lowest days by total_value
 const highestAndLowestDays = computed(() => {
-    // Aggregate total_value by date
     const totalsByDate: { [date: string]: { totalValue: number; date: string } } = {};
 
     props.flattenedRows.forEach(row => {
@@ -72,7 +71,6 @@ const highestAndLowestDays = computed(() => {
         totalsByDate[date].totalValue += row.manifest.total_value || 0;
     });
 
-    // Convert to array and sort by total_value
     const dateEntries = Object.values(totalsByDate);
     if (dateEntries.length === 0) {
         return { highest: null, lowest: null };
@@ -80,9 +78,8 @@ const highestAndLowestDays = computed(() => {
 
     dateEntries.sort((a, b) => b.totalValue - a.totalValue);
 
-    // Highest and lowest days
-    const highest = dateEntries[0]; // Highest total_value
-    const lowest = dateEntries[dateEntries.length - 1]; // Lowest total_value
+    const highest = dateEntries[0];
+    const lowest = dateEntries[dateEntries.length - 1];
 
     return {
         highest: highest ? { date: formatDate(highest.date), value: highest.totalValue.toFixed(2) } : null,
@@ -101,51 +98,65 @@ function handleDownloadCsv() {
     <div>
         <h2 class="text-xl font-semibold mb-4">{{ currentPeriod }} Summary</h2>
         <div class="mb-6 p-4 bg-gray-700 rounded-lg">
-            <div class="grid grid-cols-2 gap-[4px]">
+            <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-[4px]">
                 <!-- Total Earnings -->
-                <div class="p-4 bg-gray-800 rounded">
-                    <p class="text-gray-300 text-sm">Total Earnings</p>
-                    <p class="text-white font-bold text-lg">£{{ totalEarnings }}</p>
+                <div class="p-3 sm:p-4 bg-gray-800 rounded flex flex-col justify-center items-center text-center">
+                    <p class="text-gray-300 text-xs sm:text-sm">Total Earnings</p>
+                    <p class="text-white font-bold text-base sm:text-lg">£{{ totalEarnings }}</p>
                 </div>
 
                 <!-- Average Daily Income -->
-                <div class="p-4 bg-gray-800 rounded">
-                    <p class="text-gray-300 text-sm">Average Daily Income</p>
-                    <p class="text-white font-bold text-lg">£{{ averageDailyIncome.toFixed(2) }}</p>
+                <div class="p-3 sm:p-4 bg-gray-800 rounded flex flex-col justify-center items-center text-center">
+                    <p class="text-gray-300 text-xs sm:text-sm">Average Daily Income</p>
+                    <p class="text-white font-bold text-base sm:text-lg">£{{ averageDailyIncome.toFixed(2) }}</p>
                 </div>
 
                 <!-- Days Remaining in Period -->
-                <div class="p-4 bg-gray-800 rounded">
-                    <p class="text-gray-300 text-sm">Days Remaining in Period</p>
-                    <p class="text-white font-bold text-lg">{{ remainingDays }}</p>
+                <div class="p-3 sm:p-4 bg-gray-800 rounded flex flex-col justify-center items-center text-center">
+                    <p class="text-gray-300 text-xs sm:text-sm">Days Remaining in Period</p>
+                    <p class="text-white font-bold text-base sm:text-lg">{{ remainingDays }}</p>
                 </div>
 
-                <!-- Download as CSV Button -->
-                <div class="p-4 bg-gray-800 rounded flex items-center justify-center">
-                    <button @click="handleDownloadCsv"
-                        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-md transition duration-200">
-                        Download as CSV
-                    </button>
-                </div>
+
 
                 <!-- Highest Day -->
-                <div class="p-4 bg-gray-800 rounded">
-                    <p class="text-gray-300 text-sm">Highest Day</p>
-                    <p v-if="highestAndLowestDays.highest" class="text-white font-bold text-lg">
+                <div class="p-3 sm:p-4 bg-gray-800 rounded flex flex-col justify-center items-center text-center">
+                    <p class="text-gray-300 text-xs sm:text-sm">Highest Day</p>
+                    <p v-if="highestAndLowestDays.highest" class="text-white font-bold text-base">
                         {{ highestAndLowestDays.highest.date }} (£{{ highestAndLowestDays.highest.value }})
                     </p>
-                    <p v-else class="text-gray-400 text-sm">No data available</p>
+                    <p v-else class="text-gray-400 text-xs sm:text-sm">No data available</p>
                 </div>
 
                 <!-- Lowest Day -->
-                <div class="p-4 bg-gray-800 rounded">
-                    <p class="text-gray-300 text-sm">Lowest Day</p>
-                    <p v-if="highestAndLowestDays.lowest" class="text-white font-bold text-lg">
+                <div class="p-3 sm:p-4 bg-gray-800 rounded flex flex-col justify-center items-center text-center">
+                    <p class="text-gray-300 text-xs sm:text-sm">Lowest Day</p>
+                    <p v-if="highestAndLowestDays.lowest" class="text-white font-bold text-base">
                         {{ highestAndLowestDays.lowest.date }} (£{{ highestAndLowestDays.lowest.value }})
                     </p>
-                    <p v-else class="text-gray-400 text-sm">No data available</p>
+                    <p v-else class="text-gray-400 text-xs sm:text-sm">No data available</p>
+                </div>
+                                <!-- Download as CSV Button -->
+                <div class="p-3 sm:p-4 bg-gray-800 rounded flex items-center justify-center">
+                    <button @click="handleDownloadCsv"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1 sm:px-4 sm:py-2 rounded-md transition duration-200 text-xs sm:text-sm">
+                        Download as CSV
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 </template>
+
+<style scoped>
+/* Ensure text doesn't overflow and wraps appropriately */
+p {
+    word-break: break-word;
+}
+
+/* Adjust button size on smaller screens */
+button {
+    width: 100%;
+    box-sizing: border-box;
+}
+</style>

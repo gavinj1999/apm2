@@ -67,6 +67,32 @@ const filteredManifests = computed(() => {
     return selected ? selected.dates : [];
 });
 
+// Compute period date range
+const periodDateRange = computed(() => {
+    if (!Array.isArray(filteredManifests.value) || filteredManifests.value.length === 0) {
+        return { start: null, end: null };
+    }
+    const dates = filteredManifests.value.map(d => new Date(d.date));
+    const start = new Date(Math.min(...dates));
+    const end = new Date(Math.max(...dates));
+    return { start, end };
+});
+
+// Filter holidays for the selected period
+const filteredHolidays = computed(() => {
+    if (!periodDateRange.value.start || !periodDateRange.value.end) {
+        return [];
+    }
+    const periodStart = periodDateRange.value.start;
+    const periodEnd = periodDateRange.value.end;
+    return holidays.filter(holiday => {
+        const holidayStart = new Date(holiday.start_date);
+        const holidayEnd = new Date(holiday.end_date);
+        // Include holiday if it overlaps with the period
+        return holidayStart <= periodEnd && holidayEnd >= periodStart;
+    });
+});
+
 // Flatten filteredManifests into a list of rows for rendering
 const flattenedRows = computed(() => {
     const rows = [];
@@ -87,6 +113,27 @@ const flattenedRows = computed(() => {
     return rows;
 });
 
+// Compute summary metrics for the selected period
+const computedPeriodEarnings = computed(() => {
+    return flattenedRows.value.reduce((sum, row) => sum + (row.manifest.total_value || 0), 0);
+});
+
+const computedAverageDailyIncome = computed(() => {
+    const uniqueDates = new Set(flattenedRows.value.map(row => row.date));
+    const days = uniqueDates.size;
+    return days > 0 ? (computedPeriodEarnings.value / days) : 0;
+});
+
+// Compute remaining days (assuming period end date is known or passed from server)
+const computedRemainingDays = computed(() => {
+    if (!periodDateRange.value.end) return 0;
+    const today = new Date();
+    const periodEnd = periodDateRange.value.end;
+    if (today > periodEnd) return 0;
+    const diffTime = periodEnd.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+});
+
 // Reference to ManifestForm component
 const manifestForm = ref<InstanceType<typeof ManifestForm> | null>(null);
 
@@ -102,7 +149,7 @@ function formatDate(dateStr: string): string {
     const date = new Date(dateStr);
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = dateExamples.getFullYear();
+    const year = date.getFullYear();
     return `${day}/${month}/${year}`;
 }
 
@@ -173,18 +220,18 @@ function handleDownloadCsv() {
             />
             <SummarySection
                 :current-period="selectedPeriod"
-                :current-period-earnings="currentPeriodEarnings"
-                :average-daily-income="averageDailyIncome"
-                :remaining-days="remainingDays"
+                :current-period-earnings="computedPeriodEarnings"
+                :average-daily-income="computedAverageDailyIncome"
+                :remaining-days="computedRemainingDays"
                 :flattened-rows="flattenedRows"
-                :holidays="holidays"
+                :holidays="filteredHolidays"
                 @download-csv="handleDownloadCsv"
             />
             <ManifestTable
                 :flattened-rows="flattenedRows"
                 :parcel-types="parcelTypes"
                 :rounds="rounds"
-                :holidays="holidays"
+                :holidays="filteredHolidays"
                 @edit-manifest="handleEditManifest"
             />
         </div>
