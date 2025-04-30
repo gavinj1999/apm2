@@ -9,6 +9,7 @@ use App\Models\ParcelType;
 use Inertia\Inertia;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use App\Models\Holiday;
 
 class DashboardController extends Controller
 {
@@ -207,6 +208,8 @@ class DashboardController extends Controller
             $remainingDays = 0;
         }
 
+        $holidays = Holiday::all()->toArray();
+
         return Inertia::render('Dashboard', [
             'groupedManifests' => $groupedManifests->toArray(),
             'currentPeriodEarnings' => $currentPeriodEarnings,
@@ -215,6 +218,7 @@ class DashboardController extends Controller
             'currentPeriod' => $currentPeriodName,
             'rounds' => $rounds->toArray(),
             'parcelTypes' => $parcelTypes->toArray(),
+            'holidays' => $holidays,
             'flash' => session('flash', []),
             'debug' => $debug,
         ]);
@@ -234,5 +238,55 @@ class DashboardController extends Controller
             'debug' => $debug,
         ]);
     }
+}
+
+public function downloadCsv()
+{
+    $user = auth()->user();
+    $rounds = Round::where('user_id', $user->id)->get();
+    $roundIds = $rounds->pluck('id')->toArray();
+    $parcelTypes = ParcelType::all();
+
+    $manifests = Manifest::whereIn('round_id', $roundIds)
+        ->with(['round', 'quantities'])
+        ->get();
+
+    $headers = [
+        'Content-Type' => 'text/csv',
+        'Content-Disposition' => 'attachment; filename="manifests.csv"',
+    ];
+
+    $callback = function () use ($manifests, $parcelTypes) {
+        $file = fopen('php://output', 'w');
+        // Write CSV headers
+        $columns = ['Date', 'Round', ...$parcelTypes->pluck('name')->toArray(), 'Total Value'];
+        fputcsv($file, $columns);
+
+        // Write data
+        foreach ($manifests as $manifest) {
+            $row = [
+                $manifest->delivery_date,
+                $manifest->round->round_id ?? 'Unknown Round',
+            ];
+            foreach ($parcelTypes as $type) {
+                $quantity = $manifest->quantities->where('parcel_type_id', $type->id)->first();
+                $total = $quantity ? ($quantity->manifested + $quantity->re_manifested + $quantity->carried_forward) : 0;
+                $row[] = $total;
+            }
+            $totalValue = $manifest->quantities->sum(function ($q) use ($manifest) {
+                $price = DB::table('round_pricings')
+                    ->where('round_id', $manifest->round_id)
+                    ->where('parcel_type_id', $q->parcel_type_id)
+                    ->value('price') ?? 0;
+                return ($q->manifested + $q->re_manifested + $q->carried_forward) * $price;
+            });
+            $row[] = $totalValue;
+            fputcsv($file, $row);
+        }
+
+        fclose($file);
+    };
+
+    return response()->stream($callback, 200, $headers);
 }
 }

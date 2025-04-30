@@ -7,6 +7,7 @@ use App\Http\Controllers\ManifestController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\RoundPricingController;
 use App\Http\Controllers\NMWCalculatorController;
+use App\Http\Controllers\HolidayController;
 
 use Inertia\Inertia;
 
@@ -35,10 +36,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/prices', [RoundPricingController::class, 'store'])->name('prices.store');
     Route::put('/prices/{id}', [RoundPricingController::class, 'update'])->name('prices.update');
     Route::delete('/prices/{id}', [RoundPricingController::class, 'destroy'])->name('prices.destroy');
+    Route::get('/dashboard/download-csv', [DashboardController::class, 'downloadCsv'])->name('dashboard.downloadCsv');
 
     Route::get('/nmw-calculator', [NMWCalculatorController::class, 'index'])->name('calculator.index');
 
-
+    Route::post('/holidays', [HolidayController::class, 'store'])->name('holidays.store');
 });
 
 
