@@ -78,4 +78,18 @@ class ParcelTypeController extends Controller
 
         return redirect()->route('parcel-types.index')->with('success', 'Parcel type deleted successfully!');
     }
+    public function updateSortOrder(Request $request)
+    {
+        $order = $request->validate([
+            'order' => 'required|array',
+            'order.*.id' => 'required|exists:parcel_types,id',
+            'order.*.sort_order' => 'required|integer|min:1',
+        ])['order'];
+
+        foreach ($order as $item) {
+            ParcelType::where('id', $item['id'])->update(['sort_order' => $item['sort_order']]);
+        }
+
+        return response()->json(['success' => true]);
+    }
 }

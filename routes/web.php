@@ -8,6 +8,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\RoundPricingController;
 use App\Http\Controllers\NMWCalculatorController;
 use App\Http\Controllers\HolidayController;
+use App\Http\Controllers\ParcelTypeController;
+
 
 use Inertia\Inertia;
 
@@ -41,6 +43,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/nmw-calculator', [NMWCalculatorController::class, 'index'])->name('calculator.index');
 
     Route::post('/holidays', [HolidayController::class, 'store'])->name('holidays.store');
+    Route::patch('/parcel-types/sort', [ParcelTypeController::class, 'updateSortOrder'])->name('parcel-types.sort');
 });
 
 

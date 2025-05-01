@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class ParcelType extends Model
 {
-    protected $fillable = ['name', 'round_id'];
+    protected $fillable = ['name', 'round_id','sort_order'];
 
     public function round()
     {

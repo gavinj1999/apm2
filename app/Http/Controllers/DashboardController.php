@@ -245,7 +245,7 @@ public function downloadCsv()
     $user = auth()->user();
     $rounds = Round::where('user_id', $user->id)->get();
     $roundIds = $rounds->pluck('id')->toArray();
-    $parcelTypes = ParcelType::all();
+    $parcelTypes = ParcelType::orderBy('sort_order')->get()->toArray();
 
     $manifests = Manifest::whereIn('round_id', $roundIds)
         ->with(['round', 'quantities'])

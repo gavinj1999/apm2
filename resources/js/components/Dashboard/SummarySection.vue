@@ -87,6 +87,14 @@ const highestAndLowestDays = computed(() => {
     };
 });
 
+// Compute total parcels for the selected period
+const totalParcels = computed(() => {
+    return props.flattenedRows.reduce((sum, row) => {
+        const parcels = row.manifest.quantities.reduce((sum, q) => sum + (q.total || 0), 0);
+        return sum + parcels;
+    }, 0);
+});
+
 // Emit download event to parent
 const emit = defineEmits(['downloadCsv']);
 function handleDownloadCsv() {
@@ -95,53 +103,72 @@ function handleDownloadCsv() {
 </script>
 
 <template>
-    <div>
-        <h2 class="text-xl font-semibold mb-4">{{ currentPeriod }} Summary</h2>
-        <div class="mb-6 p-4 bg-gray-700 rounded-lg">
-            <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-[4px]">
-                <!-- Total Earnings -->
-                <div class="p-3 sm:p-4 bg-gray-800 rounded flex flex-col justify-center items-center text-center">
-                    <p class="text-gray-300 text-xs sm:text-sm">Total Earnings</p>
-                    <p class="text-white font-bold text-base sm:text-lg">£{{ totalEarnings }}</p>
+    <div class="mb-8">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-semibold mb-6 text-white">Summary for {{ currentPeriod }}</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <!-- Total Earnings Card -->
+                <div class="bg-gray-700 rounded-lg shadow-md overflow-hidden">
+                    <div class="bg-gray-600 px-4 py-2">
+                        <h3 class="text-lg font-medium text-gray-300 text-center">Total Earnings</h3>
+                    </div>
+                    <div class="p-4 flex justify-center items-center">
+                        <p class="text-md font-semibold text-white">£{{ totalEarnings }}</p>
+                    </div>
                 </div>
-
-                <!-- Average Daily Income -->
-                <div class="p-3 sm:p-4 bg-gray-800 rounded flex flex-col justify-center items-center text-center">
-                    <p class="text-gray-300 text-xs sm:text-sm">Average Daily Income</p>
-                    <p class="text-white font-bold text-base sm:text-lg">£{{ averageDailyIncome.toFixed(2) }}</p>
+                <!-- Average Daily Income Card -->
+                <div class="bg-gray-700 rounded-lg shadow-md overflow-hidden">
+                    <div class="bg-gray-600 px-4 py-2">
+                        <h3 class="text-lg font-medium text-gray-300 text-center">Day Average</h3>
+                    </div>
+                    <div class="p-4 flex justify-center items-center">
+                        <p class="text-md font-semibold text-white">£{{ averageDailyIncome.toFixed(2) }}</p>
+                    </div>
                 </div>
-
-                <!-- Days Remaining in Period -->
-                <div class="p-3 sm:p-4 bg-gray-800 rounded flex flex-col justify-center items-center text-center">
-                    <p class="text-gray-300 text-xs sm:text-sm">Days Remaining in Period</p>
-                    <p class="text-white font-bold text-base sm:text-lg">{{ remainingDays }}</p>
+                <!-- Highest/Lowest Day Card -->
+                <div class="bg-gray-700 rounded-lg shadow-md overflow-hidden">
+                    <div class="bg-gray-600 px-4 py-2">
+                        <h3 class="text-lg font-medium text-gray-300 text-center">Hi - Low</h3>
+                    </div>
+                    <div class="p-4 flex justify-center items-center">
+                        <div v-if="highestAndLowestDays.highest && highestAndLowestDays.lowest" class="text-center">
+                            <p class="text-md text-white">
+                                {{ highestAndLowestDays.highest.date }} £{{ highestAndLowestDays.highest.value }}
+                            </p>
+                            <p class="text-md font-semibold text-white">
+                                {{ highestAndLowestDays.lowest.date }} £{{ highestAndLowestDays.lowest.value }}
+                            </p>
+                        </div>
+                        <p v-else class="text-md font-semibold text-white">No data available</p>
+                    </div>
                 </div>
-
-
-
-                <!-- Highest Day -->
-                <div class="p-3 sm:p-4 bg-gray-800 rounded flex flex-col justify-center items-center text-center">
-                    <p class="text-gray-300 text-xs sm:text-sm">Highest Day</p>
-                    <p v-if="highestAndLowestDays.highest" class="text-white font-bold text-base">
-                        {{ highestAndLowestDays.highest.date }} (£{{ highestAndLowestDays.highest.value }})
-                    </p>
-                    <p v-else class="text-gray-400 text-xs sm:text-sm">No data available</p>
+                <!-- Total Parcels Card -->
+                <div class="bg-gray-700 rounded-lg shadow-md overflow-hidden">
+                    <div class="bg-gray-600 px-4 py-2">
+                        <h3 class="text-lg font-medium text-gray-300 text-center">Total Parcels</h3>
+                    </div>
+                    <div class="p-4 flex justify-center items-center">
+                        <p class="text-md font-semibold text-white">{{ totalParcels }}</p>
+                    </div>
                 </div>
-
-                <!-- Lowest Day -->
-                <div class="p-3 sm:p-4 bg-gray-800 rounded flex flex-col justify-center items-center text-center">
-                    <p class="text-gray-300 text-xs sm:text-sm">Lowest Day</p>
-                    <p v-if="highestAndLowestDays.lowest" class="text-white font-bold text-base">
-                        {{ highestAndLowestDays.lowest.date }} (£{{ highestAndLowestDays.lowest.value }})
-                    </p>
-                    <p v-else class="text-gray-400 text-xs sm:text-sm">No data available</p>
+                <!-- Days Remaining Card -->
+                <div class="bg-gray-700 rounded-lg shadow-md overflow-hidden">
+                    <div class="bg-gray-600 px-4 py-2">
+                        <h3 class="text-lg font-medium text-gray-300 text-center">Days Remaining</h3>
+                    </div>
+                    <div class="p-4 flex justify-center items-center">
+                        <p class="text-md font-semibold text-white">{{ remainingDays }}</p>
+                    </div>
                 </div>
-                                <!-- Download as CSV Button -->
-                <div class="p-3 sm:p-4 bg-gray-800 rounded flex items-center justify-center">
-                    <button @click="handleDownloadCsv"
-                        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1 sm:px-4 sm:py-2 rounded-md transition duration-200 text-xs sm:text-sm">
-                        Download as CSV
-                    </button>
+                <!-- Download CSV Card -->
+                <div class="bg-gray-700 rounded-lg shadow-md overflow-hidden">
+
+                    <div class="p-4 flex justify-center items-center">
+                        <button @click="handleDownloadCsv"
+                            class="bg-blue-600 hover:bg-blue-700 text-white text-md font-semibold px-4 py-2 rounded-md transition duration-200 w-full">
+                            Download
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -149,14 +176,47 @@ function handleDownloadCsv() {
 </template>
 
 <style scoped>
-/* Ensure text doesn't overflow and wraps appropriately */
-p {
-    word-break: break-word;
+/* Ensure consistent line heights and spacing */
+h3,
+p,
+button {
+    line-height: 1.5;
 }
 
-/* Adjust button size on smaller screens */
-button {
-    width: 100%;
-    box-sizing: border-box;
+/* Responsive font size adjustments */
+@media (max-width: 640px) {
+    h2 {
+        font-size: 1.125rem;
+        /* 18px */
+    }
+
+    h3 {
+        font-size: 0.875rem;
+        /* 14px */
+    }
+
+    p,
+    button {
+        font-size: 1.125rem;
+        /* 18px */
+    }
+}
+
+@media (min-width: 641px) and (max-width: 767px) {
+    h2 {
+        font-size: 1.25rem;
+        /* 20px */
+    }
+
+    h3 {
+        font-size: 0.875rem;
+        /* 14px */
+    }
+
+    p,
+    button {
+        font-size: 1.25rem;
+        /* 20px */
+    }
 }
 </style>

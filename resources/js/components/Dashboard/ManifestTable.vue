@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 
 const props = defineProps<{
@@ -35,6 +35,22 @@ const props = defineProps<{
 
 const emit = defineEmits(['editManifest']);
 
+// State for sorting
+const sortColumn = ref<'date' | 'totalValue' | null>(null);
+const sortDirection = ref<'asc' | 'desc'>('asc');
+
+// Toggle sorting for a column
+function toggleSort(column: 'date' | 'totalValue') {
+    if (sortColumn.value === column) {
+        // If already sorting by this column, toggle direction
+        sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        // Sort by new column, default to ascending
+        sortColumn.value = column;
+        sortDirection.value = 'asc';
+    }
+}
+
 // Helper function to format date as DD/MM/YYYY
 function formatDate(dateStr: string): string {
     const date = new Date(dateStr);
@@ -54,12 +70,10 @@ const footerTotals = computed(() => {
     const totals: { [key: number]: number } = {};
     let totalValueSum = 0;
 
-    // Initialize totals for each parcel type
     props.parcelTypes.forEach(type => {
         totals[type.id] = 0;
     });
 
-    // Sum up totals for each manifest
     props.flattenedRows.forEach(row => {
         row.manifest.quantities.forEach(quantity => {
             totals[quantity.parcel_type_id] += quantity.total || 0;
@@ -73,37 +87,63 @@ const footerTotals = computed(() => {
     };
 });
 
-// Compute holiday summaries
+// Compute holiday summaries with validation
 const holidaySummaries = computed(() => {
-    return props.holidays.map(holiday => {
-        const start = new Date(holiday.start_date);
-        const end = new Date(holiday.end_dateFloat);
-        const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1; // Include both start and end dates
-        const totalPayment = days * holiday.daily_rate;
-        return {
-            dateRange: `${formatDate(holiday.start_date)} - ${formatDate(holiday.end_date)}`,
-            days,
-            dailyRate: holiday.daily_rate,
-            totalPayment,
-        };
-    });
+    return props.holidays
+        .map(holiday => {
+            const start = new Date(holiday.start_date);
+            const end = new Date(holiday.end_date);
+
+            if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+                console.error('Invalid date for holiday:', holiday);
+                return null;
+            }
+
+            const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+            const totalPayment = days * holiday.daily_rate;
+
+            return {
+                dateRange: `${formatDate(holiday.start_date)} - ${formatDate(holiday.end_date)}`,
+                days,
+                dailyRate: holiday.daily_rate,
+                totalPayment,
+            };
+        })
+        .filter(holiday => holiday !== null);
 });
 
-// Combine manifest rows and holiday rows, sorted by date
+// Combine manifest rows and holiday rows, sorted by the selected column
 const combinedRows = computed(() => {
     const manifestRows = props.flattenedRows.map(row => ({
         type: 'manifest' as const,
         data: row,
         sortDate: new Date(row.date).getTime(),
+        sortValue: row.manifest.total_value || 0,
     }));
 
     const holidayRows = holidaySummaries.value.map(holiday => ({
         type: 'holiday' as const,
         data: holiday,
         sortDate: new Date(holiday.dateRange.split(' - ')[0]).getTime(),
+        sortValue: holiday.totalPayment,
     }));
 
-    return [...manifestRows, ...holidayRows].sort((a, b) => a.sortDate - b.sortDate);
+    const rows = [...manifestRows, ...holidayRows];
+
+    // Apply sorting
+    if (sortColumn.value) {
+        rows.sort((a, b) => {
+            let compareValue = 0;
+            if (sortColumn.value === 'date') {
+                compareValue = a.sortDate - b.sortDate;
+            } else if (sortColumn.value === 'totalValue') {
+                compareValue = a.sortValue - b.sortValue;
+            }
+            return sortDirection.value === 'asc' ? compareValue : -compareValue;
+        });
+    }
+
+    return rows;
 });
 
 // Function to delete a manifest
@@ -128,12 +168,22 @@ function editManifest(id: number) {
             <table class="w-full border border-gray-600">
                 <thead>
                     <tr class="bg-gray-700">
-                        <th class="p-3 text-left text-sm font-medium">Date</th>
+                        <th class="p-3 text-left text-sm font-medium cursor-pointer" @click="toggleSort('date')">
+                            Date
+                            <span v-if="sortColumn === 'date'" class="ml-1">
+                                {{ sortDirection === 'asc' ? '↑' : '↓' }}
+                            </span>
+                        </th>
                         <th class="p-3 text-left text-sm font-medium">Round</th>
                         <th v-for="type in parcelTypes" :key="type.id" class="p-3 text-left text-sm font-medium">
                             {{ type.name }}
                         </th>
-                        <th class="p-3 text-left text-sm font-medium">Total Value</th>
+                        <th class="p-3 text-left text-sm font-medium cursor-pointer" @click="toggleSort('totalValue')">
+                            Total Value
+                            <span v-if="sortColumn === 'totalValue'" class="ml-1">
+                                {{ sortDirection === 'asc' ? '↑' : '↓' }}
+                            </span>
+                        </th>
                         <th class="p-3 text-left text-sm font-medium">Actions</th>
                     </tr>
                 </thead>
@@ -209,12 +259,16 @@ function editManifest(id: number) {
                 </tfoot>
             </table>
         </div>
-        </div>
-
+    </div>
 </template>
 
 <style scoped>
 td {
     vertical-align: top;
+}
+
+th.cursor-pointer:hover {
+    background-color: #4a5568; /* Tailwind's gray-600 */
+    transition: background-color 0.2s ease;
 }
 </style>
