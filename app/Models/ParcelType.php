@@ -18,3 +18,4 @@ class ParcelType extends Model
         return $this->hasMany(RoundPricing::class);
     }
 }
+

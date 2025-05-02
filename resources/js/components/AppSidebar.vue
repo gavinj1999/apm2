@@ -23,6 +23,11 @@ const mainNavItems: NavItem[] = [
         icon: LayoutGrid,
     },
     {
+        title: 'Parcel Types',
+        href: '/parcel-types',
+        icon: LayoutGrid,
+    },
+    {
         title: 'Calculator',
         href: '/nmw-calculator',
         icon: LayoutGrid,

@@ -11,6 +11,7 @@ use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\ParcelTypeController;
 
 
+
 use Inertia\Inertia;
 
 Route::get('/', function () {
@@ -44,6 +45,9 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/holidays', [HolidayController::class, 'store'])->name('holidays.store');
     Route::patch('/parcel-types/sort', [ParcelTypeController::class, 'updateSortOrder'])->name('parcel-types.sort');
+
+    Route::resource('parcel-types', ParcelTypeController::class)->except(['create', 'edit', 'show']);
+
 });
 
 
