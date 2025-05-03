@@ -18,4 +18,9 @@ class ManifestSummary extends Model
         return $this->belongsTo(ParcelType::class);
     }
 
+    public function getTotalParcelsAttribute()
+    {
+        return ($this->manifested ?? 0) + ($this->re_manifested ?? 0) + ($this->carried_forward ?? 0);
+    }
+
 }

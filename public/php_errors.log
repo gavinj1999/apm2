@@ -5,3 +5,5 @@
 [28-Apr-2025 18:34:25 UTC] PHP Fatal error:  Maximum execution time of 30 seconds exceeded in E:\vscode\apm2\vendor\laravel\framework\src\Illuminate\Foundation\Exceptions\Renderer\Exception.php on line 111
 [28-Apr-2025 18:35:00 UTC] PHP Fatal error:  Maximum execution time of 30 seconds exceeded in E:\vscode\apm2\vendor\laravel\framework\src\Illuminate\Database\Connection.php on line 409
 [28-Apr-2025 18:35:31 UTC] PHP Fatal error:  Maximum execution time of 30 seconds exceeded in E:\vscode\apm2\vendor\laravel\framework\src\Illuminate\Database\Connection.php on line 409
+[03-May-2025 17:39:58 UTC] PHP Fatal error:  Cannot redeclare class App\Http\Controllers\ReportsController (previously declared in E:\vscode\apm2\app\Http\Controllers\ReportController.php:11) in E:\vscode\apm2\app\Http\Controllers\ReportController.php on line 11
+[03-May-2025 17:41:31 UTC] PHP Fatal error:  Cannot redeclare class App\Http\Controllers\ReportsController (previously declared in E:\vscode\apm2\app\Http\Controllers\ReportController.php:11) in E:\vscode\apm2\app\Http\Controllers\ReportController.php on line 11
