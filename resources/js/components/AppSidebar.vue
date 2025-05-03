@@ -32,6 +32,11 @@ const mainNavItems: NavItem[] = [
         href: '/nmw-calculator',
         icon: LayoutGrid,
     },
+    {
+        title: 'Reports',
+        href: '/reports',
+        icon: LayoutGrid,
+    },
 ];
 
 const footerNavItems: NavItem[] = [
