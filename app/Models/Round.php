@@ -29,4 +29,11 @@ class Round extends Model
     {
         return $this->hasMany(RoundPricing::class, 'round_id', 'id');
     }
+
+    public function parcelTypes()
+    {
+        return $this->belongsToMany(ParcelType::class, 'round_pricings')
+            ->withPivot('price');
+    }
+
 }
