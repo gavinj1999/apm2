@@ -1,4 +1,5 @@
 <template>
+    <AppLayout>
     <div class="p-6 bg-gray-900 text-gray-100 min-h-screen">
         <h1 class="text-2xl font-semibold mb-6 tracking-tight">Delivery Reports</h1>
 
@@ -71,11 +72,14 @@
             </div>
         </div>
     </div>
+</AppLayout>
 </template>
 
 <script setup>
 import { ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
+import AppLayout from '@/layouts/AppLayout.vue';
+
 
 const props = defineProps({
     availablePeriods: Object,
