@@ -1,4 +1,5 @@
 <template>
+    <AppLayout>
     <div class="p-6 bg-gray-900 text-gray-100 min-h-screen">
       <!-- Page Title -->
       <h1 class="text-2xl font-semibold mb-6">Parcel Types</h1>
@@ -89,12 +90,13 @@
         </div>
       </div>
     </div>
+</AppLayout>
   </template>
 
   <script setup>
   import { computed } from 'vue';
   import { useForm, router } from '@inertiajs/vue3';
-
+import AppLayout from '@/layouts/AppLayout.vue';
   // Define props explicitly
   const props = defineProps({
     parcelTypes: Array,
