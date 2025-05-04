@@ -62,23 +62,30 @@
           <img src="/images/loading.gif" alt="Loading..." class="w-12 h-12" />
         </div>
 
-        <!-- Charts -->
-        <div v-else class="mb-8 flex space-x-4">
-          <!-- Income Summary Bar Chart (75% width) -->
-          <div class="w-3/4 bg-gray-800 rounded-lg shadow-md p-6">
-            <h2 class="text-xl font-semibold mb-4 text-gray-100 tracking-tight">Income Summary by Period</h2>
-            <BarChart :chart-data="barChartData" :options="barChartOptions" />
-          </div>
-
-          <!-- Parcel Type Pie Chart (25% width) -->
-          <div class="w-1/4 bg-gray-800 rounded-lg shadow-md p-6 flex flex-col items-center">
-            <h2 class="text-xl font-semibold mb-4 text-gray-100 tracking-tight">Parcel Type Distribution</h2>
-            <PieChart :chart-data="pieChartData" :options="pieChartOptions" />
-          </div>
-        </div>
-
-        <!-- Report Data -->
+        <!-- Charts and Report Data -->
         <div v-else class="space-y-8">
+          <!-- Charts -->
+          <div class="mb-8 flex space-x-4">
+            <!-- Income Summary Bar Chart (75% width) -->
+            <div class="w-3/4 h-[400px] bg-gray-800 rounded-lg shadow-md p-6">
+              <h2 class="text-xl font-semibold mb-4 text-gray-100 tracking-tight">Income Summary by Period</h2>
+              <div v-if="barChartData.labels.length === 0" class="text-gray-400 text-center italic">
+                No income data available for any periods.
+              </div>
+              <BarChart v-else :chart-data="barChartData" :options="barChartOptions" />
+            </div>
+
+            <!-- Parcel Type Pie Chart (25% width) -->
+            <div class="w-1/4 h-[400px] bg-gray-800 rounded-lg shadow-md p-6 flex flex-col items-center">
+              <h2 class="text-xl font-semibold mb-4 text-gray-100 tracking-tight">Parcel Type Distribution</h2>
+              <div v-if="pieChartData.labels.length === 0" class="text-gray-400 text-center italic">
+                No parcel type data available for selected periods.
+              </div>
+              <PieChart v-else :chart-data="pieChartData" :options="pieChartOptions" />
+            </div>
+          </div>
+
+          <!-- Report Data -->
           <div v-if="Object.keys(reportData).length === 0 && totalSummary.total_parcels === 0" class="text-gray-400 text-center italic py-8 bg-gray-800 rounded-lg shadow-md">
             No data available for the selected periods.
           </div>
@@ -256,6 +263,15 @@
   const selectedPeriodLabels = computed(() => {
     return selectedPeriods.value.map(periodId => props.availablePeriods[periodId]);
   });
+
+  // Debug chart data
+  watch(() => props.incomeByPeriod, (newValue) => {
+    console.log('Income by Period:', newValue);
+  }, { immediate: true });
+
+  watch(() => props.pieChartData, (newValue) => {
+    console.log('Pie Chart Data:', newValue);
+  }, { immediate: true });
 
   // Bar Chart Data and Options
   const barChartData = computed(() => ({
@@ -445,10 +461,5 @@
   /* Dropdown styling */
   .max-h-60 {
     max-height: 15rem;
-  }
-
-  /* Chart container height */
-  .w-3/4, .w-1/4 {
-    height: 400px;
   }
   </style>
