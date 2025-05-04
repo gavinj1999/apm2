@@ -72,7 +72,7 @@
               <div v-if="!isBarChartDataValid" class="text-gray-400 text-center italic">
                 No income data available for any periods.
               </div>
-              <BarChart v-else :chart-data="barChartData" :options="barChartOptions" />
+              <BarChartCanvas v-else-if="isChartDataReady" :chart-data="barChartData" :options="barChartOptions" />
             </div>
 
             <!-- Parcel Type Pie Chart (25% width) -->
@@ -81,7 +81,7 @@
               <div v-if="!isPieChartDataValid" class="text-gray-400 text-center italic">
                 No parcel type data available for selected periods.
               </div>
-              <PieChart v-else :chart-data="pieChartData" :options="pieChartOptions" />
+              <PieChartCanvas v-else-if="isChartDataReady" :chart-data="pieChartData" :options="pieChartOptions" />
             </div>
           </div>
 
@@ -222,27 +222,12 @@
   </template>
 
   <script setup>
-  import { ref, watch, computed } from 'vue';
+  import { ref, watch, computed, onMounted, nextTick } from 'vue';
   import { router } from '@inertiajs/vue3';
   import AppLayout from '@/layouts/AppLayout.vue';
-  import { Bar, Pie } from 'vue-chartjs';
-  import {
-    Chart as ChartJS,
-    Title,
-    Tooltip,
-    Legend,
-    BarElement,
-    CategoryScale,
-    LinearScale,
-    ArcElement,
-  } from 'chart.js';
-
-  // Register Chart.js components
-  ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement);
-
-  // Chart components
-  const BarChart = Bar;
-  const PieChart = Pie;
+  import BarChartCanvas from '@/components/BarChartCanvas.vue';
+  import PieChartCanvas from '@/components/PieChartCanvas.vue';
+  import { toRaw } from 'vue';
 
   const props = defineProps({
     availablePeriods: Object,
@@ -260,30 +245,72 @@
   const areRoundSummariesExpanded = ref(false);
   const isBarChartDataValid = ref(false);
   const isPieChartDataValid = ref(false);
+  const isChartDataReady = ref(false);
+  const barChartData = ref({
+    labels: [],
+    datasets: [],
+  });
+  const pieChartData = ref({
+    labels: [],
+    datasets: [],
+  });
 
   // Compute the labels of selected periods for display
   const selectedPeriodLabels = computed(() => {
     return selectedPeriods.value.map(periodId => props.availablePeriods[periodId]);
   });
 
-  // Bar Chart Data and Options
-  const barChartData = computed(() => {
+  // Initialize chart data
+  const updateChartData = async () => {
+    await nextTick();
+
+    // Bar Chart Data
     const incomeByPeriod = Array.isArray(props.incomeByPeriod) ? props.incomeByPeriod : [];
-    const labels = incomeByPeriod.map(item => item.period_name || 'Unknown');
-    const data = incomeByPeriod.map(item => item.income || 0);
-    isBarChartDataValid.value = labels.length > 0 && data.length > 0;
-    return {
-      labels,
+    const barLabels = incomeByPeriod.map(item => item.period_name || 'Unknown');
+    const barDataValues = incomeByPeriod.map(item => item.income || 0);
+    barChartData.value = {
+      labels: barLabels,
       datasets: [
         {
           label: 'Income (£)',
           backgroundColor: '#3B82F6',
-          data,
+          data: barDataValues,
         },
       ],
     };
-  });
+    isBarChartDataValid.value = barLabels.length > 0 && barDataValues.length > 0 && barDataValues.some(val => val > 0);
+    console.log('Bar Chart Data Updated:', barChartData.value, 'Valid:', isBarChartDataValid.value);
 
+    // Pie Chart Data
+    const pieDataRaw = toRaw(props.pieChartData) || { labels: [], data: [] };
+    const pieLabels = Array.isArray(pieDataRaw.labels) ? [...pieDataRaw.labels] : [];
+    const pieDataValues = Array.isArray(pieDataRaw.data) ? [...pieDataRaw.data] : [];
+    pieChartData.value = {
+      labels: pieLabels,
+      datasets: [
+        {
+          backgroundColor: [
+            '#3B82F6',
+            '#EF4444',
+            '#10B981',
+            '#F59E0B',
+            '#8B5CF6',
+            '#EC4899',
+            '#14B8A6',
+            '#F97316',
+          ],
+          data: pieDataValues,
+        },
+      ],
+    };
+    isPieChartDataValid.value = pieLabels.length > 0 && pieDataValues.length > 0;
+    console.log('Pie Chart Data Updated:', pieChartData.value, 'Valid:', isPieChartDataValid.value);
+
+    // Mark the chart data as ready
+    isChartDataReady.value = true;
+  };
+
+  // Chart Options
   const barChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -330,32 +357,6 @@
     },
   };
 
-  // Pie Chart Data and Options
-  const pieChartData = computed(() => {
-    const pieData = props.pieChartData && typeof props.pieChartData === 'object' ? props.pieChartData : { labels: [], data: [] };
-    const labels = Array.isArray(pieData.labels) ? pieData.labels : [];
-    const data = Array.isArray(pieData.data) ? pieData.data : [];
-    isPieChartDataValid.value = labels.length > 0 && data.length > 0;
-    return {
-      labels,
-      datasets: [
-        {
-          backgroundColor: [
-            '#3B82F6',
-            '#EF4444',
-            '#10B981',
-            '#F59E0B',
-            '#8B5CF6',
-            '#EC4899',
-            '#14B8A6',
-            '#F97316',
-          ],
-          data,
-        },
-      ],
-    };
-  });
-
   const pieChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -382,11 +383,20 @@
   // Debug chart data
   watch(() => props.incomeByPeriod, (newValue) => {
     console.log('Income by Period:', newValue);
+    isChartDataReady.value = false; // Reset the flag
+    updateChartData();
   }, { immediate: true });
 
   watch(() => props.pieChartData, (newValue) => {
     console.log('Pie Chart Data:', newValue);
+    isChartDataReady.value = false; // Reset the flag
+    updateChartData();
   }, { immediate: true });
+
+  // Ensure charts render after data is ready
+  onMounted(() => {
+    updateChartData();
+  });
 
   const toggleDropdown = () => {
     isDropdownOpen.value = !isDropdownOpen.value;
@@ -420,6 +430,7 @@
       preserveState: true,
       onFinish: () => {
         isLoading.value = false;
+        updateChartData();
       },
     });
   });
@@ -431,6 +442,7 @@
       preserveState: true,
       onFinish: () => {
         isLoading.value = false;
+        updateChartData();
         areRoundSummariesExpanded.value = false; // Collapse on page load
       },
     });
