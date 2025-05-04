@@ -274,16 +274,19 @@
   }, { immediate: true });
 
   // Bar Chart Data and Options
-  const barChartData = computed(() => ({
-    labels: props.incomeByPeriod.map(item => item.period_name),
-    datasets: [
-      {
-        label: 'Income (£)',
-        backgroundColor: '#3B82F6',
-        data: props.incomeByPeriod.map(item => item.income),
-      },
-    ],
-  }));
+  const barChartData = computed(() => {
+    const incomeByPeriod = props.incomeByPeriod || [];
+    return {
+      labels: incomeByPeriod.map(item => item.period_name) || [],
+      datasets: [
+        {
+          label: 'Income (£)',
+          backgroundColor: '#3B82F6',
+          data: incomeByPeriod.map(item => item.income) || [],
+        },
+      ],
+    };
+  });
 
   const barChartOptions = {
     responsive: true,
@@ -332,24 +335,27 @@
   };
 
   // Pie Chart Data and Options
-  const pieChartData = computed(() => ({
-    labels: props.pieChartData.labels,
-    datasets: [
-      {
-        backgroundColor: [
-          '#3B82F6',
-          '#EF4444',
-          '#10B981',
-          '#F59E0B',
-          '#8B5CF6',
-          '#EC4899',
-          '#14B8A6',
-          '#F97316',
-        ],
-        data: props.pieChartData.data,
-      },
-    ],
-  }));
+  const pieChartData = computed(() => {
+    const pieData = props.pieChartData || { labels: [], data: [] };
+    return {
+      labels: pieData.labels || [],
+      datasets: [
+        {
+          backgroundColor: [
+            '#3B82F6',
+            '#EF4444',
+            '#10B981',
+            '#F59E0B',
+            '#8B5CF6',
+            '#EC4899',
+            '#14B8A6',
+            '#F97316',
+          ],
+          data: pieData.data || [],
+        },
+      ],
+    };
+  });
 
   const pieChartOptions = {
     responsive: true,
@@ -410,13 +416,16 @@
     });
   });
 
-  // Set initial loading state and collapse round summaries on mount
+  // Initial load
   if (props.selectedPeriods.length) {
     isLoading.value = true;
-    areRoundSummariesExpanded.value = false; // Collapse on page load
-    setTimeout(() => {
-      isLoading.value = false;
-    }, 500); // Simulate initial load
+    router.get('/reports', { periods: props.selectedPeriods }, {
+      preserveState: true,
+      onFinish: () => {
+        isLoading.value = false;
+        areRoundSummariesExpanded.value = false; // Collapse on page load
+      },
+    });
   }
   </script>
 

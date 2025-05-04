@@ -90,7 +90,7 @@ class ReportController extends Controller
                 $percentage = $totalParcels ? ($count / $totalParcels * 100) : 0;
 
                 return [
-                    'name' => $parcelType->name,
+                    'name' => $parcelType ? $parcelType->name : 'Unknown',
                     'total' => $count,
                     'income' => $income,
                     'percentage' => $percentage,
@@ -150,7 +150,7 @@ class ReportController extends Controller
                         $percentage = $totalParcels ? ($count / $totalParcels * 100) : 0;
 
                         return [
-                            'name' => $parcelType->name,
+                            'name' => $parcelType ? $parcelType->name : 'Unknown',
                             'total' => $count,
                             'income' => $income,
                             'percentage' => $percentage,
@@ -199,8 +199,8 @@ class ReportController extends Controller
 
         // Prepare data for the parcel type pie chart (based on selected periods)
         $pieChartData = [
-            'labels' => array_column($totalPacketTypeData, 'name'),
-            'data' => array_column($totalPacketTypeData, 'total'),
+            'labels' => array_column($totalPacketTypeData, 'name') ?: [],
+            'data' => array_column($totalPacketTypeData, 'total') ?: [],
         ];
 
         return Inertia::render('Reports/Index', [
@@ -208,7 +208,7 @@ class ReportController extends Controller
             'selectedPeriods' => $selectedPeriodIds,
             'totalSummary' => $totalSummary,
             'reportData' => $reportData,
-            'incomeByPeriod' => $incomeByPeriod,
+            'incomeByPeriod' => $incomeByPeriod ?: [],
             'pieChartData' => $pieChartData,
             'flash' => session('flash', []),
         ]);
