@@ -41,6 +41,12 @@ class ReportController extends Controller
             ->with(['round', 'quantities.parcelType'])
             ->get();
 
+        // Debug: Log the raw data
+        \Log::info('All Periods:', $allPeriods->toArray());
+        \Log::info('Selected Periods:', $selectedPeriods->toArray());
+        \Log::info('Rounds:', $rounds->toArray());
+        \Log::info('Manifests:', $manifests->toArray());
+
         // Filter manifests by the selected periods' date ranges for summary and pie chart
         $filteredManifests = $manifests->filter(function ($manifest) use ($selectedPeriods) {
             return $selectedPeriods->contains(function ($period) use ($manifest) {
@@ -50,6 +56,9 @@ class ReportController extends Controller
                 return $deliveryDate >= $startDate && $deliveryDate <= $endDate;
             });
         });
+
+        // Debug: Log filtered manifests
+        \Log::info('Filtered Manifests:', $filteredManifests->toArray());
 
         // Calculate total summary across all rounds and selected periods
         $totalParcels = $filteredManifests->sum(function ($manifest) {
@@ -96,6 +105,9 @@ class ReportController extends Controller
                     'percentage' => $percentage,
                 ];
             })->values()->toArray();
+
+        // Debug: Log total packet type data
+        \Log::info('Total Packet Type Data:', $totalPacketTypeData);
 
         $totalSummary = [
             'name' => 'Total Summary',
@@ -197,11 +209,17 @@ class ReportController extends Controller
             ];
         })->toArray();
 
+        // Debug: Log income by period
+        \Log::info('Income by Period:', $incomeByPeriod);
+
         // Prepare data for the parcel type pie chart (based on selected periods)
         $pieChartData = [
             'labels' => array_column($totalPacketTypeData, 'name') ?: [],
             'data' => array_column($totalPacketTypeData, 'total') ?: [],
         ];
+
+        // Debug: Log pie chart data
+        \Log::info('Pie Chart Data:', $pieChartData);
 
         return Inertia::render('Reports/Index', [
             'availablePeriods' => $availablePeriods,

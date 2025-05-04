@@ -69,7 +69,7 @@
             <!-- Income Summary Bar Chart (75% width) -->
             <div class="w-3/4 h-[400px] bg-gray-800 rounded-lg shadow-md p-6">
               <h2 class="text-xl font-semibold mb-4 text-gray-100 tracking-tight">Income Summary by Period</h2>
-              <div v-if="barChartData.labels.length === 0" class="text-gray-400 text-center italic">
+              <div v-if="!isBarChartDataValid" class="text-gray-400 text-center italic">
                 No income data available for any periods.
               </div>
               <BarChart v-else :chart-data="barChartData" :options="barChartOptions" />
@@ -78,7 +78,7 @@
             <!-- Parcel Type Pie Chart (25% width) -->
             <div class="w-1/4 h-[400px] bg-gray-800 rounded-lg shadow-md p-6 flex flex-col items-center">
               <h2 class="text-xl font-semibold mb-4 text-gray-100 tracking-tight">Parcel Type Distribution</h2>
-              <div v-if="pieChartData.labels.length === 0" class="text-gray-400 text-center italic">
+              <div v-if="!isPieChartDataValid" class="text-gray-400 text-center italic">
                 No parcel type data available for selected periods.
               </div>
               <PieChart v-else :chart-data="pieChartData" :options="pieChartOptions" />
@@ -258,31 +258,27 @@
   const isLoading = ref(false);
   const isDropdownOpen = ref(false);
   const areRoundSummariesExpanded = ref(false);
+  const isBarChartDataValid = ref(false);
+  const isPieChartDataValid = ref(false);
 
   // Compute the labels of selected periods for display
   const selectedPeriodLabels = computed(() => {
     return selectedPeriods.value.map(periodId => props.availablePeriods[periodId]);
   });
 
-  // Debug chart data
-  watch(() => props.incomeByPeriod, (newValue) => {
-    console.log('Income by Period:', newValue);
-  }, { immediate: true });
-
-  watch(() => props.pieChartData, (newValue) => {
-    console.log('Pie Chart Data:', newValue);
-  }, { immediate: true });
-
   // Bar Chart Data and Options
   const barChartData = computed(() => {
-    const incomeByPeriod = props.incomeByPeriod || [];
+    const incomeByPeriod = Array.isArray(props.incomeByPeriod) ? props.incomeByPeriod : [];
+    const labels = incomeByPeriod.map(item => item.period_name || 'Unknown');
+    const data = incomeByPeriod.map(item => item.income || 0);
+    isBarChartDataValid.value = labels.length > 0 && data.length > 0;
     return {
-      labels: incomeByPeriod.map(item => item.period_name) || [],
+      labels,
       datasets: [
         {
           label: 'Income (£)',
           backgroundColor: '#3B82F6',
-          data: incomeByPeriod.map(item => item.income) || [],
+          data,
         },
       ],
     };
@@ -336,9 +332,12 @@
 
   // Pie Chart Data and Options
   const pieChartData = computed(() => {
-    const pieData = props.pieChartData || { labels: [], data: [] };
+    const pieData = props.pieChartData && typeof props.pieChartData === 'object' ? props.pieChartData : { labels: [], data: [] };
+    const labels = Array.isArray(pieData.labels) ? pieData.labels : [];
+    const data = Array.isArray(pieData.data) ? pieData.data : [];
+    isPieChartDataValid.value = labels.length > 0 && data.length > 0;
     return {
-      labels: pieData.labels || [],
+      labels,
       datasets: [
         {
           backgroundColor: [
@@ -351,7 +350,7 @@
             '#14B8A6',
             '#F97316',
           ],
-          data: pieData.data || [],
+          data,
         },
       ],
     };
@@ -379,6 +378,15 @@
       },
     },
   };
+
+  // Debug chart data
+  watch(() => props.incomeByPeriod, (newValue) => {
+    console.log('Income by Period:', newValue);
+  }, { immediate: true });
+
+  watch(() => props.pieChartData, (newValue) => {
+    console.log('Pie Chart Data:', newValue);
+  }, { immediate: true });
 
   const toggleDropdown = () => {
     isDropdownOpen.value = !isDropdownOpen.value;
