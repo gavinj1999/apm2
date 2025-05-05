@@ -66,9 +66,9 @@
         <div v-else class="space-y-8">
           <!-- Charts -->
           <div class="mb-8 flex space-x-4">
-            <!-- Income Summary Bar Chart (75% width) -->
+            <!-- Income and Profit Summary Bar Chart (75% width) -->
             <div class="w-3/4 h-[400px] bg-gray-800 rounded-lg shadow-md p-6">
-              <h2 class="text-xl font-semibold mb-4 text-gray-100 tracking-tight">Income Summary by Period</h2>
+              <h2 class="text-xl font-semibold mb-4 text-gray-100 tracking-tight">Income and Profit Summary by Period</h2>
               <div v-if="!isBarChartDataValid" class="text-gray-400 text-center italic">
                 No income data available for any periods.
               </div>
@@ -79,7 +79,7 @@
             <div class="w-1/4 h-[400px] bg-gray-800 rounded-lg shadow-md p-6 flex flex-col items-center">
               <h2 class="text-xl font-semibold mb-4 text-gray-100 tracking-tight">Parcel Type Distribution</h2>
               <div v-if="!isPieChartDataValid" class="text-gray-400 text-center italic">
-                No parcel type data available for selected periods.
+                No parcel type data available for selected periods. Try selecting a different period.
               </div>
               <PieChartCanvas v-else-if="isChartDataReady" :chart-data="pieChartData" :options="pieChartOptions" />
             </div>
@@ -87,7 +87,7 @@
 
           <!-- Report Data -->
           <div v-if="Object.keys(reportData).length === 0 && totalSummary.total_parcels === 0" class="text-gray-400 text-center italic py-8 bg-gray-800 rounded-lg shadow-md">
-            No data available for the selected periods.
+            No data available for the selected periods. Try selecting a different period.
           </div>
           <div v-else class="space-y-6">
             <!-- Total Summary Card -->
@@ -111,6 +111,16 @@
                     <tr class="border-t border-gray-700 hover:bg-gray-700 transition-colors">
                       <td class="py-3 px-6 text-gray-100 font-medium">Total Income (£)</td>
                       <td class="py-3 px-6 text-gray-100">{{ totalSummary.total_income.toFixed(2) }}</td>
+                    </tr>
+                    <tr class="border-t border-gray-700 hover:bg-gray-700 transition-colors">
+                      <td class="py-3 px-6 text-gray-100 font-medium">Total Cost (£)</td>
+                      <td class="py-3 px-6 text-gray-100">{{ totalSummary.total_cost.toFixed(2) }}</td>
+                    </tr>
+                    <tr class="border-t border-gray-700 hover:bg-gray-700 transition-colors">
+                      <td class="py-3 px-6 text-gray-100 font-medium">Total Profit (£)</td>
+                      <td class="py-3 px-6 text-gray-100" :class="totalSummary.total_profit >= 0 ? 'text-green-400' : 'text-red-400'">
+                        {{ totalSummary.total_profit.toFixed(2) }}
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -183,6 +193,16 @@
                           <td class="py-3 px-6 text-gray-100 font-medium">Total Income (£)</td>
                           <td class="py-3 px-6 text-gray-100">{{ data.total_income.toFixed(2) }}</td>
                         </tr>
+                        <tr class="border-t border-gray-700 hover:bg-gray-700 transition-colors">
+                          <td class="py-3 px-6 text-gray-100 font-medium">Total Cost (£)</td>
+                          <td class="py-3 px-6 text-gray-100">{{ data.total_cost.toFixed(2) }}</td>
+                        </tr>
+                        <tr class="border-t border-gray-700 hover:bg-gray-700 transition-colors">
+                          <td class="py-3 px-6 text-gray-100 font-medium">Total Profit (£)</td>
+                          <td class="py-3 px-6 text-gray-100" :class="data.total_profit >= 0 ? 'text-green-400' : 'text-red-400'">
+                            {{ data.total_profit.toFixed(2) }}
+                          </td>
+                        </tr>
                       </tbody>
                     </table>
                   </div>
@@ -221,7 +241,7 @@
     </AppLayout>
   </template>
 
-  <script setup>
+  <script setup lang="ts">
   import { ref, watch, computed, onMounted, nextTick } from 'vue';
   import { router } from '@inertiajs/vue3';
   import AppLayout from '@/layouts/AppLayout.vue';
@@ -264,21 +284,27 @@
   const updateChartData = async () => {
     await nextTick();
 
-    // Bar Chart Data
+    // Bar Chart Data (Income and Profit)
     const incomeByPeriod = Array.isArray(props.incomeByPeriod) ? props.incomeByPeriod : [];
     const barLabels = incomeByPeriod.map(item => item.period_name || 'Unknown');
-    const barDataValues = incomeByPeriod.map(item => item.income || 0);
+    const incomeDataValues = incomeByPeriod.map(item => item.income || 0);
+    const profitDataValues = incomeByPeriod.map(item => item.profit || 0);
     barChartData.value = {
       labels: barLabels,
       datasets: [
         {
           label: 'Income (£)',
           backgroundColor: '#3B82F6',
-          data: barDataValues,
+          data: incomeDataValues,
+        },
+        {
+          label: 'Profit (£)',
+          backgroundColor: '#10B981',
+          data: profitDataValues,
         },
       ],
     };
-    isBarChartDataValid.value = barLabels.length > 0 && barDataValues.length > 0 && barDataValues.some(val => val > 0);
+    isBarChartDataValid.value = barLabels.length > 0 && (incomeDataValues.some(val => val > 0) || profitDataValues.some(val => val !== 0));
     console.log('Bar Chart Data Updated:', barChartData.value, 'Valid:', isBarChartDataValid.value);
 
     // Pie Chart Data
@@ -319,7 +345,7 @@
         beginAtZero: true,
         title: {
           display: true,
-          text: 'Income (£)',
+          text: 'Amount (£)',
           color: '#D1D5DB',
         },
         ticks: {

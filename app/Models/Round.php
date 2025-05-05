@@ -9,7 +9,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Round extends Model
 {
-    protected $fillable = ['round_id', 'name', 'user_id'];
+    protected $fillable = [
+        'user_id',
+        'name',
+        'created_at',
+        'updated_at',
+    ];
 
     public function user(): BelongsTo
     {
@@ -34,6 +39,11 @@ class Round extends Model
     {
         return $this->belongsToMany(ParcelType::class, 'round_pricings')
             ->withPivot('price');
+    }
+
+    public function serviceProfiles()
+    {
+        return $this->hasMany(ServiceProfile::class);
     }
 
 }

@@ -9,6 +9,8 @@ use App\Http\Controllers\RoundPricingController;
 use App\Http\Controllers\NMWCalculatorController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\ParcelTypeController;
+use App\Http\Controllers\ServiceProfileController;
+use App\Http\Controllers\LocationController;
 
 
 
@@ -48,7 +50,17 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('parcel-types', ParcelTypeController::class)->except(['create', 'edit', 'show']);
 
+    Route::get('/service-profile', [ServiceProfileController::class, 'index'])->name('service-profile');
+    Route::post('/service-profile', [ServiceProfileController::class, 'store'])->name('service-profile.store');
+    Route::get('/service-profile/{id}/edit', [ServiceProfileController::class, 'edit'])->name('service-profile.edit');
+    Route::put('/service-profile/{id}', [ServiceProfileController::class, 'update'])->name('service-profile.update');
+    Route::delete('/service-profile/{id}', [ServiceProfileController::class, 'destroy'])->name('service-profile.destroy');
+
+
+
 });
+
+
 
 
 
