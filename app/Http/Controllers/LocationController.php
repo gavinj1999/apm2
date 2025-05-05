@@ -96,6 +96,45 @@ class LocationController extends Controller
         }
     }
 
+    public function update(Request $request, $id)
+    {
+        if (!Auth::check()) {
+            Log::warning('Unauthenticated attempt to update location', ['user_id' => Auth::id()]);
+            return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+
+        $serviceProfile = ServiceProfile::where('user_id', Auth::id())->first();
+        if (!$serviceProfile) {
+            Log::warning('Service profile not found for user', ['user_id' => Auth::id()]);
+            return response()->json(['error' => 'Service profile not found'], 404);
+        }
+
+        $location = $serviceProfile->locations()->find($id);
+        if (!$location) {
+            Log::warning('Location not found for update', ['location_id' => $id, 'user_id' => Auth::id()]);
+            return response()->json(['error' => 'Location not found'], 404);
+        }
+
+        $validated = $request->validate([
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
+        ]);
+
+        try {
+            $location->update($validated);
+            Log::debug('Location updated successfully', ['location_id' => $id, 'user_id' => Auth::id(), 'new_position' => $validated]);
+            return response()->json($location, 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to update location: ' . $e->getMessage(), [
+                'exception' => $e->getTraceAsString(),
+                'location_id' => $id,
+                'user_id' => Auth::id(),
+                'validated' => $validated,
+            ]);
+            return response()->json(['error' => 'Failed to update location: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function destroy($id)
     {
         if (!Auth::check()) {

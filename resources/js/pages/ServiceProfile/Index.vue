@@ -122,14 +122,17 @@
               <label class="block mb-2 font-medium text-gray-300">Set Locations on Map</label>
               <div ref="map" class="w-full h-96 bg-gray-700 rounded-lg"></div>
               <p class="mt-2 text-sm text-gray-400">Click the map to set Home, Work, Start, and End locations in that order. Distances will be calculated in miles.</p>
-              <button
-                type="button"
-                @click="clearPins"
-                class="mt-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500 transition-all duration-200"
-                :disabled="isClearing"
-              >
-                {{ isClearing ? 'Clearing...' : clearFeedback || 'Clear Pins' }}
-              </button>
+              <div class="flex items-center space-x-2">
+                <button
+                  type="button"
+                  @click="clearPins"
+                  class="mt-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500 transition-all duration-200"
+                  :disabled="isClearing"
+                >
+                  {{ isClearing ? 'Clearing...' : clearFeedback || 'Clear Pins' }}
+                </button>
+                <span v-if="moveFeedback" class="mt-2 text-sm text-green-400">{{ moveFeedback }}</span>
+              </div>
             </div>
 
             <!-- Form Actions -->
@@ -201,6 +204,7 @@
   const markers = ref([]); // Store map markers for removal
   const isClearing = ref(false); // Track clearing state
   const clearFeedback = ref(''); // Display feedback after clearing
+  const moveFeedback = ref(''); // Display feedback after moving a pin
 
   // Set Mapbox access token from props
   mapboxgl.accessToken = props.mapboxAccessToken;
@@ -258,6 +262,62 @@
     return el;
   };
 
+  // Recalculate distances based on current pin positions
+  const recalculateDistances = () => {
+    const home = locations.value.find((loc) => loc.name === 'Home');
+    const work = locations.value.find((loc) => loc.name === 'Work');
+    const start = locations.value.find((loc) => loc.name === 'Start Location');
+    const end = locations.value.find((loc) => loc.name === 'End Location');
+
+    // Calculate distance_home_to_work
+    form.distance_home_to_work = (home && work) ? haversineDistance(home, work).toFixed(2) : 0;
+
+    // Calculate distance_work_to_start
+    form.distance_work_to_start = (work && start) ? haversineDistance(work, start).toFixed(2) : 0;
+
+    // Calculate distance_end_to_home
+    form.distance_end_to_home = (end && home) ? haversineDistance(end, home).toFixed(2) : 0;
+  };
+
+  // Update location position in the backend
+  const updateLocationPosition = async (locationId, latitude, longitude) => {
+    try {
+      // Ensure CSRF token is fresh
+      if (!(await fetchCsrfToken())) {
+        alert('Failed to initialize request. Please refresh the page.');
+        return false;
+      }
+
+      const response = await axios.put(`/api/locations/${locationId}`, {
+        latitude,
+        longitude,
+      });
+
+      // Update the local locations array
+      const locationIndex = locations.value.findIndex(loc => loc.id === locationId);
+      if (locationIndex !== -1) {
+        locations.value[locationIndex].latitude = latitude;
+        locations.value[locationIndex].longitude = longitude;
+      }
+
+      // Recalculate distances after every move
+      recalculateDistances();
+
+      moveFeedback.value = `${locations.value[locationIndex].name} moved!`;
+      setTimeout(() => { moveFeedback.value = ''; }, 2000);
+      return true;
+    } catch (error) {
+      console.error('Error updating location position:', error);
+      if (error.response?.status === 401) {
+        alert('Session expired. Please log in again.');
+        router.visit('/login');
+      } else {
+        alert('Failed to update location position: ' + (error.response?.data?.error || error.message || 'Unknown error'));
+      }
+      return false;
+    }
+  };
+
   // Initialize Mapbox
   onMounted(async () => {
     if (!props.mapboxAccessToken) {
@@ -279,9 +339,16 @@
     // Load existing pins with custom markers
     locations.value.forEach((loc) => {
       const markerElement = createCustomMarkerElement(loc.name, markerColors[loc.name]);
-      const marker = new mapboxgl.Marker({ element: markerElement })
+      const marker = new mapboxgl.Marker({ element: markerElement, draggable: true })
         .setLngLat([loc.longitude, loc.latitude])
         .addTo(mapInstance.value);
+
+      // Handle drag end to update position
+      marker.on('dragend', async () => {
+        const { lng, lat } = marker.getLngLat();
+        await updateLocationPosition(loc.id, lat, lng);
+      });
+
       markers.value.push(marker);
     });
 
@@ -314,22 +381,20 @@
 
         // Add custom marker with the location name
         const markerElement = createCustomMarkerElement(name, markerColors[name]);
-        const marker = new mapboxgl.Marker({ element: markerElement })
+        const marker = new mapboxgl.Marker({ element: markerElement, draggable: true })
           .setLngLat([lng, lat])
           .addTo(mapInstance.value);
+
+        // Handle drag end to update position
+        marker.on('dragend', async () => {
+          const { lng, lat } = marker.getLngLat();
+          await updateLocationPosition(newLocation.id, lat, lng);
+        });
+
         markers.value.push(marker);
 
-        // Calculate distances when all 4 pins are set
-        if (locations.value.length === 4) {
-          const home = locations.value.find((loc) => loc.name === 'Home');
-          const work = locations.value.find((loc) => loc.name === 'Work');
-          const start = locations.value.find((loc) => loc.name === 'Start Location');
-          const end = locations.value.find((loc) => loc.name === 'End Location');
-
-          form.distance_home_to_work = haversineDistance(home, work).toFixed(2);
-          form.distance_work_to_start = haversineDistance(work, start).toFixed(2);
-          form.distance_end_to_home = haversineDistance(end, home).toFixed(2);
-        }
+        // Recalculate distances after adding a new pin
+        recalculateDistances();
       } catch (error) {
         console.error('Error saving location:', error);
         if (error.response?.status === 401) {
@@ -461,5 +526,6 @@
   /* Optional: Adjust custom marker positioning if needed */
   .custom-marker {
     transform: translate(-50%, -50%); /* Center the marker on the coordinates */
+    cursor: move; /* Indicate that the marker is draggable */
   }
   </style>
