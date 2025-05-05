@@ -120,18 +120,23 @@
             <!-- Map Section -->
             <div class="mb-4">
               <label class="block mb-2 font-medium text-gray-300">Set Locations on Map</label>
+              <div v-if="isRecalculating" class="bg-yellow-600 text-white p-2 rounded-lg mb-2 text-center transition-opacity duration-300">
+                Recalculating Distances...
+              </div>
               <div ref="map" class="w-full h-96 bg-gray-700 rounded-lg"></div>
               <p class="mt-2 text-sm text-gray-400">Click the map to set Home, Work, Start, and End locations in that order. Distances will be calculated in miles.</p>
-              <div class="flex items-center space-x-2">
+              <div class="mt-2">
                 <button
                   type="button"
                   @click="clearPins"
-                  class="mt-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500 transition-all duration-200"
+                  class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500 transition-all duration-200"
                   :disabled="isClearing"
                 >
                   {{ isClearing ? 'Clearing...' : clearFeedback || 'Clear Pins' }}
                 </button>
-                <span v-if="moveFeedback" class="mt-2 text-sm text-green-400">{{ moveFeedback }}</span>
+                <!-- <div v-if="moveFeedback" class="mt-2 w-full bg-green-600 text-white p-2 rounded-lg text-center text-lg font-semibold transition-opacity duration-300">
+                  {{ moveFeedback }}
+                </div> -->
               </div>
             </div>
 
@@ -205,6 +210,7 @@
   const isClearing = ref(false); // Track clearing state
   const clearFeedback = ref(''); // Display feedback after clearing
   const moveFeedback = ref(''); // Display feedback after moving a pin
+  const isRecalculating = ref(false); // Track recalculation state
 
   // Set Mapbox access token from props
   mapboxgl.accessToken = props.mapboxAccessToken;
@@ -264,6 +270,7 @@
 
   // Recalculate distances based on current pin positions
   const recalculateDistances = () => {
+    isRecalculating.value = true;
     const home = locations.value.find((loc) => loc.name === 'Home');
     const work = locations.value.find((loc) => loc.name === 'Work');
     const start = locations.value.find((loc) => loc.name === 'Start Location');
@@ -277,6 +284,8 @@
 
     // Calculate distance_end_to_home
     form.distance_end_to_home = (end && home) ? haversineDistance(end, home).toFixed(2) : 0;
+
+    setTimeout(() => { isRecalculating.value = false; }, 500); // Simulate a short delay for visibility
   };
 
   // Update location position in the backend
@@ -332,16 +341,20 @@
     mapInstance.value = new mapboxgl.Map({
       container: map.value,
       style: 'mapbox://styles/mapbox/dark-v10', // Dark theme
-      center: [-0.1278, 51.5074], // Default: London
+      center: [-0.1278, 51.5074], // Default: London (will be overridden if pins exist)
       zoom: 9,
     });
 
     // Load existing pins with custom markers
+    const bounds = new mapboxgl.LngLatBounds();
     locations.value.forEach((loc) => {
       const markerElement = createCustomMarkerElement(loc.name, markerColors[loc.name]);
       const marker = new mapboxgl.Marker({ element: markerElement, draggable: true })
         .setLngLat([loc.longitude, loc.latitude])
         .addTo(mapInstance.value);
+
+      // Extend bounds to include this pin
+      bounds.extend([loc.longitude, loc.latitude]);
 
       // Handle drag end to update position
       marker.on('dragend', async () => {
@@ -351,6 +364,14 @@
 
       markers.value.push(marker);
     });
+
+    // Fit map to bounds if there are locations
+    if (locations.value.length > 0) {
+      mapInstance.value.fitBounds(bounds, {
+        padding: 50, // Add padding around the bounds
+        maxZoom: 15, // Limit max zoom to avoid too close a view
+      });
+    }
 
     // Handle pin dropping (limit to 4 pins)
     mapInstance.value.on('click', async (e) => {
