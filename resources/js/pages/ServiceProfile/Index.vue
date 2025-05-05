@@ -171,7 +171,7 @@
   import { reactive, ref, onMounted, onUnmounted } from 'vue';
   import { router } from '@inertiajs/vue3';
   import mapboxgl from 'mapbox-gl';
-  import AppLayout from '@/Layouts/AppLayout.vue';
+  import AppLayout from '@/layouts/AppLayout.vue';
   import axios from 'axios';
 
   const props = defineProps({
