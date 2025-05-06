@@ -18,16 +18,21 @@ class LocationController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        $serviceProfile = ServiceProfile::where('user_id', Auth::id())->first();
+        $serviceProfileId = request()->query('service_profile_id');
+        if (!$serviceProfileId) {
+            return response()->json([]);
+        }
+
+        $serviceProfile = ServiceProfile::where('user_id', Auth::id())->find($serviceProfileId);
         if (!$serviceProfile) {
             return response()->json([]);
         }
+
         return response()->json($serviceProfile->locations);
     }
 
     public function store(Request $request)
     {
-        // Log request headers for debugging
         Log::debug('LocationController::store headers', [
             'Cookies' => $request->header('Cookie'),
             'X-XSRF-TOKEN' => $request->header('X-XSRF-TOKEN'),
@@ -45,49 +50,26 @@ class LocationController extends Controller
             'name' => 'required|string|max:255',
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
+            'service_profile_id' => 'required|exists:service_profiles,id',
         ]);
 
         try {
-            // Find an existing ServiceProfile for the user
-            $serviceProfile = ServiceProfile::where('user_id', $userId)->first();
+            $serviceProfile = ServiceProfile::where('user_id', $userId)
+                ->find($validated['service_profile_id']);
 
             if (!$serviceProfile) {
-                // Find or create a default round for the user
-                $defaultRound = Round::where('user_id', $userId)->first();
-                if (!$defaultRound) {
-                    Log::info('No rounds found for user ID: ' . $userId . '. Creating default round.');
-                    $defaultRound = Round::create([
-                        'user_id' => $userId,
-                        'name' => 'Default Round ' . now()->toDateTimeString(),
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-                }
-
-                Log::debug('Default Round ID: ' . $defaultRound->id);
-
-                // Create a new ServiceProfile
-                $serviceProfile = ServiceProfile::create([
+                Log::warning('Service profile not found for user', [
                     'user_id' => $userId,
-                    'round_id' => $defaultRound->id,
-                    'fuel_cost_per_unit' => 0,
-                    'distance_unit' => 'mile',
-                    'distance_home_to_work' => 0,
-                    'distance_work_to_start' => 0,
-                    'distance_end_to_home' => 0,
-                    'loading_time_cost_per_hour' => 0,
-                    'loading_time_hours' => 0,
+                    'service_profile_id' => $validated['service_profile_id'],
                 ]);
+                return response()->json(['error' => 'Service profile not found'], 404);
             }
 
-            Log::debug('ServiceProfile ID: ' . $serviceProfile->id);
-
-            // Create the location associated with the ServiceProfile, including user_id
             $locationData = array_merge($validated, ['user_id' => $userId]);
             $location = $serviceProfile->locations()->create($locationData);
             return response()->json($location, 201);
         } catch (\Exception $e) {
-            Log::error('Failed to create ServiceProfile, Round, or Location: ' . $e->getMessage(), [
+            Log::error('Failed to create Location: ' . $e->getMessage(), [
                 'exception' => $e->getTraceAsString(),
                 'user_id' => $userId,
                 'validated' => $validated,
@@ -103,7 +85,8 @@ class LocationController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        $serviceProfile = ServiceProfile::where('user_id', Auth::id())->first();
+        $serviceProfileId = request()->query('service_profile_id');
+        $serviceProfile = ServiceProfile::where('user_id', Auth::id())->find($serviceProfileId);
         if (!$serviceProfile) {
             Log::warning('Service profile not found for user', ['user_id' => Auth::id()]);
             return response()->json(['error' => 'Service profile not found'], 404);
@@ -142,7 +125,8 @@ class LocationController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        $serviceProfile = ServiceProfile::where('user_id', Auth::id())->first();
+        $serviceProfileId = request()->query('service_profile_id');
+        $serviceProfile = ServiceProfile::where('user_id', Auth::id())->find($serviceProfileId);
         if (!$serviceProfile) {
             Log::warning('Service profile not found for user', ['user_id' => Auth::id()]);
             return response()->json(['error' => 'Service profile not found'], 404);

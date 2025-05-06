@@ -16,6 +16,9 @@ return [
     'openweathermap' => [
         'key' => env('OPENWEATHERMAP_API_KEY'),
     ],
+    'mapbox' => [
+        'access_token' => env('MAPBOX_ACCESS_TOKEN'),
+    ],
     'tomtom' => [
         'key' => env('TOMTOM_API_KEY'),
     ],
