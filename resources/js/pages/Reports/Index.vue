@@ -39,11 +39,11 @@
                 v-if="isDropdownOpen"
                 class="absolute z-10 mt-2 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto"
               >
-                <div class="grid grid-cols-3 gap-2 p-4">
+                <div class="p-2">
                   <label
                     v-for="(label, periodId) in availablePeriods"
                     :key="periodId"
-                    class="flex items-center p-2 hover:bg-gray-700 rounded-md cursor-pointer transition-all duration-200"
+                    class="flex items-center p-3 hover:bg-gray-700 rounded-md cursor-pointer transition-all duration-200"
                   >
                     <input
                       type="checkbox"
@@ -51,7 +51,7 @@
                       v-model="selectedPeriods"
                       class="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
                     />
-                    <span class="ml-2 text-gray-100">{{ label }}</span>
+                    <span class="ml-3 text-gray-100 text-sm">{{ label }}</span>
                   </label>
                 </div>
               </div>
@@ -108,7 +108,7 @@
 
         <!-- Loading State -->
         <div v-if="isLoading" class="flex justify-center items-center mb-8">
-          <img src="/images/loading.gif" alt="Loading..." class="w-12 h-12" />
+          <span class="text-gray-100 text-lg">Loading...</span>
         </div>
 
         <!-- Charts and Report Data -->
@@ -309,7 +309,7 @@
                       </thead>
                       <tbody>
                         <tr
-                          v-for="(packet, index) in data.packet_types"
+                          v-for="(packet, index) in totalSummary.packet_types"
                           :key="index"
                           class="border-t border-gray-700 hover:bg-gray-700 transition-colors"
                         >
