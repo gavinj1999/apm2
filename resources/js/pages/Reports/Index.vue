@@ -208,41 +208,6 @@
               </div>
             </div>
 
-            <!-- Delivery Performance Table -->
-            <div v-if="deliveryPerformance.length > 0" class="bg-gray-800 rounded-lg shadow-md p-6 transition-all duration-200 hover:shadow-lg">
-              <h2 class="text-xl font-semibold mb-4 text-gray-100 tracking-tight">Delivery Performance</h2>
-              <div class="overflow-x-auto">
-                <table class="min-w-full table-auto border-separate border-spacing-0">
-                  <thead>
-                    <tr class="bg-gray-700 text-gray-300 text-sm uppercase tracking-wider">
-                      <th class="py-3 px-6 text-left rounded-tl-lg">Date</th>
-                      <th class="py-3 px-6 text-left">Round</th>
-                      <th class="py-3 px-6 text-left">Parcel Type</th>
-                      <th class="py-3 px-6 text-left">Parcels</th>
-                      <th class="py-3 px-6 text-left">Income (£)</th>
-                      <th class="py-3 px-6 text-left rounded-tr-lg">Profit (£)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="(entry, index) in deliveryPerformance"
-                      :key="index"
-                      class="border-t border-gray-700 hover:bg-gray-700 transition-colors"
-                    >
-                      <td class="py-3 px-6 text-gray-100">{{ entry.date }}</td>
-                      <td class="py-3 px-6 text-gray-100">{{ entry.round_name }}</td>
-                      <td class="py-3 px-6 text-gray-100">{{ entry.parcel_type }}</td>
-                      <td class="py-3 px-6 text-gray-100">{{ entry.parcels }}</td>
-                      <td class="py-3 px-6 text-gray-100">{{ entry.income.toFixed(2) }}</td>
-                      <td class="py-3 px-6 text-gray-100" :class="entry.profit >= 0 ? 'text-green-400' : 'text-red-400'">
-                        {{ entry.profit.toFixed(2) }}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
             <!-- Per Round and Period Cards (Collapsible) -->
             <div v-if="reportData.length > 0" class="bg-gray-800 rounded-lg shadow-md p-6 transition-all duration-200 hover:shadow-lg">
               <button
@@ -309,7 +274,7 @@
                       </thead>
                       <tbody>
                         <tr
-                          v-for="(packet, index) in totalSummary.packet_types"
+                          v-for="(packet, index) in data.packet_types"
                           :key="index"
                           class="border-t border-gray-700 hover:bg-gray-700 transition-colors"
                         >
@@ -333,7 +298,7 @@
   <script setup lang="ts">
   import { ref, watch, computed, onMounted, nextTick } from 'vue';
   import { router } from '@inertiajs/vue3';
-  import AppLayout from '@/layouts/AppLayout.vue';
+  import AppLayout from '@/Layouts/AppLayout.vue';
   import BarChartCanvas from '@/components/BarChartCanvas.vue';
   import PieChartCanvas from '@/components/PieChartCanvas.vue';
   import LineChartCanvas from '@/components/LineChartCanvas.vue';
@@ -348,7 +313,6 @@
     pieChartData: Object,
     rounds: Array,
     parcelTypes: Array,
-    deliveryPerformance: Array,
     flash: Object,
   });
 
@@ -431,12 +395,12 @@
     isPieChartDataValid.value = pieLabels.length > 0 && pieDataValues.length > 0;
 
     // Line Chart Data (Income Trend)
-    const performance = Array.isArray(props.deliveryPerformance) ? props.deliveryPerformance : [];
-    const lineLabels = performance.map(entry => entry.date).filter((v, i, a) => a.indexOf(v) === i); // Unique dates
-    const lineDataValues = lineLabels.map(date => {
-      return performance
-        .filter(entry => entry.date === date)
-        .reduce((sum, entry) => sum + entry.income, 0);
+    const filteredManifests = Array.isArray(props.reportData) ? props.reportData : [];
+    const lineLabels = filteredManifests.map(entry => entry.period_name).filter((v, i, a) => a.indexOf(v) === i); // Unique period names
+    const lineDataValues = lineLabels.map(periodName => {
+      return filteredManifests
+        .filter(entry => entry.period_name === periodName)
+        .reduce((sum, entry) => sum + entry.total_income, 0);
     });
     lineChartData.value = {
       labels: lineLabels,
@@ -510,7 +474,7 @@
         grid: { color: '#4B5563' },
       },
       x: {
-        title: { display: true, text: 'Date', color: '#D1D5DB' },
+        title: { display: true, text: 'Period', color: '#D1D5DB' },
         ticks: { color: '#D1D5DB' },
         grid: { color: '#4B5563' },
       },
@@ -523,9 +487,9 @@
 
   // Export to CSV
   const exportToCsv = () => {
-    const headers = ['Date,Round,Parcel Type,Parcels,Income (£),Profit (£)'];
-    const rows = props.deliveryPerformance.map(entry =>
-      `${entry.date},${entry.round_name},${entry.parcel_type},${entry.parcels},${entry.income.toFixed(2)},${entry.profit.toFixed(2)}`
+    const headers = ['Period,Round,Total Parcels,Total Income (£),Total Cost (£),Total Profit (£)'];
+    const rows = props.reportData.map(entry =>
+      `${entry.period_name},${entry.name},${entry.total_parcels},${entry.total_income.toFixed(2)},${entry.total_cost.toFixed(2)},${entry.total_profit.toFixed(2)}`
     );
     const csvContent = headers.concat(rows).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -553,7 +517,7 @@
   };
 
   // Debug chart data
-  watch(() => [props.incomeByPeriod, props.pieChartData, props.deliveryPerformance], () => {
+  watch(() => [props.incomeByPeriod, props.pieChartData, props.reportData], () => {
     isChartDataReady.value = false;
     updateChartData();
   }, { immediate: true });

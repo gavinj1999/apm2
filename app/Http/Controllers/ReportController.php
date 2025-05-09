@@ -256,45 +256,6 @@ class ReportController extends Controller
             })->filter();
         })->values()->toArray();
 
-        // Delivery performance data
-        $deliveryPerformance = $filteredManifests->flatMap(function ($manifest) use ($rounds, $serviceProfile, $request) {
-            $round = $rounds->firstWhere('id', $manifest->round_id);
-            if (!$round) {
-                return [];
-            }
-
-            $cost = 0;
-            if ($serviceProfile && (!$serviceProfile->round_id || $serviceProfile->round_id === $round->id)) {
-                $totalDistance = $serviceProfile->distance_to_location + $serviceProfile->distance_from_location;
-                $fuelCost = $totalDistance * $serviceProfile->fuel_cost_per_unit;
-                $loadingCost = $serviceProfile->loading_time_hours * $serviceProfile->loading_time_cost_per_hour;
-                $cost = $fuelCost + $loadingCost;
-            }
-
-            return $manifest->quantities
-                ->filter(function ($quantity) use ($request) {
-                    return !$request->parcel_type_id || $quantity->parcel_type_id == $request->parcel_type_id;
-                })
-                ->map(function ($quantity) use ($manifest, $round, $cost) {
-                    $rate = $round->parcelTypes()
-                        ->where('parcel_types.id', $quantity->parcel_type_id)
-                        ->first()
-                        ?->pivot
-                        ->price ?? 0;
-                    $income = $quantity->total_parcels * $rate;
-                    $profit = $income - $cost;
-
-                    return [
-                        'date' => $manifest->delivery_date,
-                        'round_name' => $round->name ?? $round->round_id,
-                        'parcel_type' => $quantity->parcelType ? $quantity->parcelType->name : 'Unknown',
-                        'parcels' => $quantity->total_parcels,
-                        'income' => $income,
-                        'profit' => $profit,
-                    ];
-                });
-        })->values()->toArray();
-
         // Prepare data for the income summary bar chart (all periods)
         $incomeByPeriod = $allPeriods->map(function ($period) use ($manifests, $rounds, $serviceProfile) {
             $periodManifests = $manifests->filter(function ($manifest) use ($period) {
@@ -366,7 +327,6 @@ class ReportController extends Controller
             'totalSummary' => $totalSummary,
             'incomeByPeriod' => $incomeByPeriod,
             'pieChartData' => $pieChartData,
-            'deliveryPerformance' => $deliveryPerformance,
             'flash' => session('flash', []),
         ]);
     }

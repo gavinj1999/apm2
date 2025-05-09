@@ -26,6 +26,7 @@ class DashboardController extends Controller
         $debug['roundIds'] = $roundIds;
 
         $parcelTypes = ParcelType::all();
+
         $debug['parcelTypesCount'] = $parcelTypes->count();
 
         $manifests = Manifest::whereIn('round_id', $roundIds)
