@@ -298,7 +298,7 @@
   <script setup lang="ts">
   import { ref, watch, computed, onMounted, nextTick } from 'vue';
   import { router } from '@inertiajs/vue3';
-  import AppLayout from '@/Layouts/AppLayout.vue';
+  import AppLayout from '@/layouts/AppLayout.vue';
   import BarChartCanvas from '@/components/BarChartCanvas.vue';
   import PieChartCanvas from '@/components/PieChartCanvas.vue';
   import LineChartCanvas from '@/components/LineChartCanvas.vue';
