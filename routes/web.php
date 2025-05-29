@@ -45,7 +45,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/nmw-calculator', [NMWCalculatorController::class, 'index'])->name('calculator.index');
 
-    Route::post('/holidays', [HolidayController::class, 'store'])->name('holidays.store');
+     Route::post('/holidays', [HolidayController::class, 'store'])->name('holidays.store');
+    Route::put('/holidays/{holiday}', [HolidayController::class, 'update'])->name('holidays.update');
+    Route::delete('/holidays/{holiday}', [HolidayController::class, 'destroy'])->name('holidays.destroy');
     Route::patch('/parcel-types/sort', [ParcelTypeController::class, 'updateSortOrder'])->name('parcel-types.sort');
 
     Route::resource('parcel-types', ParcelTypeController::class)->except(['create', 'edit', 'show']);

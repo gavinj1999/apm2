@@ -1,3 +1,4 @@
+<!-- resources/js/Pages/Dashboard.vue -->
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
@@ -18,7 +19,17 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 // Props with default values
-const { groupedManifests, currentPeriodEarnings = 0, averageDailyIncome = 0, remainingDays = 0, currentPeriod = 'Unknown Period', rounds, parcelTypes, flash, holidays = [] } = defineProps<{
+const {
+    groupedManifests,
+    currentPeriodEarnings = 0,
+    averageDailyIncome = 0,
+    remainingDays = 0,
+    currentPeriod = 'Unknown Period',
+    rounds,
+    parcelTypes,
+    flash,
+    holidays = [],
+} = defineProps<{
     groupedManifests: Array<{
         period_name: string;
         dates: Array<{
@@ -49,9 +60,10 @@ const { groupedManifests, currentPeriodEarnings = 0, averageDailyIncome = 0, rem
     parcelTypes: Array<{ id: number; name: string }>;
     flash?: { success?: string; error?: string };
     holidays?: Array<{
+        id: number;
         start_date: string;
         end_date: string;
-        daily_rate: number;
+        daily_rate: number; // Ensure number
     }>;
 }>();
 
@@ -85,10 +97,12 @@ const filteredHolidays = computed(() => {
     }
     const periodStart = periodDateRange.value.start;
     const periodEnd = periodDateRange.value.end;
-    return holidays.filter(holiday => {
+    return holidays.map(h => ({
+        ...h,
+        daily_rate: typeof h.daily_rate === 'string' ? parseFloat(h.daily_rate) : h.daily_rate,
+    })).filter(holiday => {
         const holidayStart = new Date(holiday.start_date);
         const holidayEnd = new Date(holiday.end_date);
-        // Include holiday if it overlaps with the period
         return holidayStart <= periodEnd && holidayEnd >= periodStart;
     });
 });
@@ -124,7 +138,7 @@ const computedAverageDailyIncome = computed(() => {
     return days > 0 ? (computedPeriodEarnings.value / days) : 0;
 });
 
-// Compute remaining days (assuming period end date is known or passed from server)
+// Compute remaining days
 const computedRemainingDays = computed(() => {
     if (!periodDateRange.value.end) return 0;
     const today = new Date();
@@ -134,13 +148,21 @@ const computedRemainingDays = computed(() => {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 });
 
-// Reference to ManifestForm component
+// References to components
 const manifestForm = ref<InstanceType<typeof ManifestForm> | null>(null);
+const holidayForm = ref<InstanceType<typeof HolidayForm> | null>(null);
 
-// Handle editManifest event from ManifestTable
+// Handle editManifest event
 function handleEditManifest(id: number) {
     if (manifestForm.value) {
         manifestForm.value.editManifest(id);
+    }
+}
+
+// Handle editHoliday event
+function handleEditHoliday(id: number) {
+    if (holidayForm.value) {
+        holidayForm.value.editHoliday(id);
     }
 }
 
@@ -160,30 +182,26 @@ function getRoundName(roundId: string): string {
 
 // Handle CSV download
 function handleDownloadCsv() {
-    // Define CSV headers
-    const headers = ['Date', 'Round', ...parcelTypes.map(type => type.name), 'Total Value', 'Actions'];
-
-    // Map table rows to CSV rows
+    const headers = ['Date', 'Round', 'Total Parcels', ...parcelTypes.map(type => type.name), 'Avg. Parcel Rate', 'Total Value'];
     const csvRows = flattenedRows.value.map(row => {
-        const date = formatDate(row.date); // Show date on every row
+        const date = formatDate(row.date);
         const roundName = getRoundName(row.manifest.round_id);
+        const totalParcels = row.manifest.quantities.reduce((sum, q) => sum + (q.total || 0), 0);
         const parcelQuantities = parcelTypes.map(type =>
             row.manifest.quantities.find(q => q.parcel_type_id === type.id)?.total ?? 0
         );
-        const totalValue = (row.manifest.total_value || 0).toFixed(2); // Remove £ symbol
-        const actions = ''; // Actions column will be empty in CSV
-        return [date, roundName, ...parcelQuantities, totalValue, actions];
+        const avgParcelRate = totalParcels > 0 ? (row.manifest.total_value / totalParcels).toFixed(2) : '0.00';
+        const totalValue = (row.manifest.total_value || 0).toFixed(2);
+        return [date, roundName, totalParcels, ...parcelQuantities, avgParcelRate, totalValue];
     });
 
-    // Combine headers and rows into CSV content (no footer)
     const csvContent = [
         headers,
         ...csvRows,
     ]
-        .map(row => row.map(cell => `"${cell}"`).join(',')) // Wrap each cell in quotes to handle commas
+        .map(row => row.map(cell => `"${cell}"`).join(','))
         .join('\n');
 
-    // Create a Blob and trigger download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -212,7 +230,7 @@ function handleDownloadCsv() {
             <!-- Dashboard Content -->
             <h1 class="text-3xl font-bold mb-6">Dashboard</h1>
             <ManifestForm ref="manifestForm" :rounds="rounds" :parcel-types="parcelTypes" />
-            <HolidayForm />
+            <HolidayForm ref="holidayForm" :holidays="holidays" />
             <PeriodSelector
                 :grouped-manifests="groupedManifests"
                 :current-period="currentPeriod"
@@ -233,6 +251,7 @@ function handleDownloadCsv() {
                 :rounds="rounds"
                 :holidays="filteredHolidays"
                 @edit-manifest="handleEditManifest"
+                @edit-holiday="handleEditHoliday"
             />
         </div>
     </AppLayout>
