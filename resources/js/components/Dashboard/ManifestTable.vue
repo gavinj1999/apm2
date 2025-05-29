@@ -1,6 +1,6 @@
 <!-- resources/js/components/Dashboard/ManifestTable.vue -->
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { toast } from 'vue3-toastify';
 
@@ -67,6 +67,11 @@ const centeredParcelTypes = [
 
 // Calculate total number of columns (fixed + dynamic parcelTypes)
 const totalColumns = computed(() => 6 + props.parcelTypes.length); // Date, Round, Total Parcels, parcelTypes, Avg. Parcel Rate, Total Value, Actions
+
+// Debug parcel types
+onMounted(() => {
+    console.log('ParcelTypes:', props.parcelTypes.map(type => type.name));
+});
 
 // Toggle sorting for a column
 function toggleSort(column: 'date' | 'totalValue' | 'totalParcels' | 'averageRate') {
@@ -291,7 +296,7 @@ function deleteHoliday(id: number) {
                         <th
                             v-for="type in parcelTypes"
                             :key="type.id"
-                            class="p-1 text-sm font-medium text-center hidden sm:table-cell rotated-header"
+                            class="p-1 text-sm font-medium hidden sm:table-cell h-24 min-w-12 flex items-center justify-center -rotate-90 whitespace-nowrap"
                         >
                             {{ type.name }}
                         </th>
@@ -547,27 +552,13 @@ table {
 th:not(:last-child),
 td:not(:last-child) {
     width: calc((100% - 120px) / (v-bind(totalColumns) - 1)); /* Distribute width excluding Actions */
-    min-width: 50px; /* Reduced for rotated headers */
+    min-width: 48px; /* Adjusted for rotated headers */
 }
 
 th:last-child,
 td:last-child {
     width: 120px; /* Wider for Actions */
     min-width: 120px; /* Prevent shrinking */
-}
-
-/* Rotate parcel type headers */
-.rotated-header {
-    height: 100px; /* Increase header height for rotated text */
-    vertical-align: bottom; /* Align text at bottom */
-    padding-bottom: 10px; /* Space for rotation */
-}
-
-.rotated-header > * {
-    display: inline-block;
-    transform: rotate(-90deg);
-    transform-origin: center bottom;
-    white-space: nowrap; /* Prevent wrapping within rotated text */
 }
 
 th.cursor-pointer:hover {
