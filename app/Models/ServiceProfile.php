@@ -7,15 +7,17 @@ use Illuminate\Database\Eloquent\Model;
 class ServiceProfile extends Model
 {
     protected $fillable = [
-        'user_id',
-        'round_id',
+'round_id',
         'fuel_cost_per_unit',
         'distance_unit',
-        'distance_home_to_work', // New field
-        'distance_work_to_start', // New field
-        'distance_end_to_home', // New field
+        'distance_home_to_work',
+        'distance_work_to_start',
+        'distance_end_to_home',
         'loading_time_cost_per_hour',
         'loading_time_hours',
+        'total_fuel_cost',
+        'total_loading_cost',
+        'total_cost',
     ];
 
     public function user()

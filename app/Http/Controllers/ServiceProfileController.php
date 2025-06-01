@@ -36,7 +36,7 @@ class ServiceProfileController extends Controller
         }
 
         return inertia('ServiceProfile/Index', [
-            'serviceProfiles' => $serviceProfiles->toArray(), // Convert to array to avoid Inertia serialization issues
+            'serviceProfiles' => $serviceProfiles->toArray(),
             'rounds' => $rounds->toArray(),
             'initialLocations' => $serviceProfiles->flatMap->locations->toArray(),
             'mapboxAccessToken' => $mapboxAccessToken,
@@ -45,22 +45,33 @@ class ServiceProfileController extends Controller
 
     public function store(Request $request)
     {
+        $user = Auth::user();
+
         $validated = $request->validate([
-            'round_id' => 'nullable|exists:rounds,id',
+            'round_id' => 'required|exists:rounds,id',
             'fuel_cost_per_unit' => 'required|numeric|min:0',
             'distance_unit' => 'required|in:mile,km',
-            'distance_to_location' => 'required|numeric|min:0',
-            'distance_from_location' => 'required|numeric|min:0',
+            'distance_home_to_work' => 'required|numeric|min:0',
+            'distance_work_to_start' => 'required|numeric|min:0',
+            'distance_end_to_home' => 'required|numeric|min:0',
             'loading_time_cost_per_hour' => 'required|numeric|min:0',
             'loading_time_hours' => 'required|numeric|min:0',
+            'total_fuel_cost' => 'required|numeric|min:0',
+            'total_loading_cost' => 'required|numeric|min:0',
+            'total_cost' => 'required|numeric|min:0',
         ]);
 
-        $profile = ServiceProfile::updateOrCreate(
-            ['user_id' => Auth::id()],
-            $validated
-        );
-
-        return redirect()->route('service-profile')->with('success', 'Profile saved successfully');
+        try {
+            $profile = ServiceProfile::create(array_merge($validated, ['user_id' => $user->id]));
+            return redirect()->route('service-profile')->with('success', 'Profile saved successfully');
+        } catch (\Exception $e) {
+            Log::error('Failed to create ServiceProfile: ' . $e->getMessage(), [
+                'exception' => $e->getTraceAsString(),
+                'user_id' => $user->id,
+                'validated' => $validated,
+            ]);
+            return redirect()->route('service-profile')->with('error', 'Failed to save Service Profile: ' . $e->getMessage());
+        }
     }
 
     public function edit($id)
@@ -114,6 +125,9 @@ class ServiceProfileController extends Controller
             'distance_end_to_home' => 'required|numeric|min:0',
             'loading_time_cost_per_hour' => 'required|numeric|min:0',
             'loading_time_hours' => 'required|numeric|min:0',
+            'total_fuel_cost' => 'required|numeric|min:0',
+            'total_loading_cost' => 'required|numeric|min:0',
+            'total_cost' => 'required|numeric|min:0',
         ]);
 
         try {
@@ -122,7 +136,7 @@ class ServiceProfileController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to update ServiceProfile: ' . $e->getMessage(), [
                 'exception' => $e->getTraceAsString(),
-                'user_id' => Auth::id(),
+                'user_id' => $user->id,
                 'validated' => $validated,
             ]);
             return redirect()->route('service-profile')->with('error', 'Failed to update Service Profile: ' . $e->getMessage());
@@ -141,7 +155,7 @@ class ServiceProfileController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to delete ServiceProfile: ' . $e->getMessage(), [
                 'exception' => $e->getTraceAsString(),
-                'user_id' => Auth::id(),
+                'user_id' => $user->id,
                 'service_profile_id' => $id,
             ]);
             return redirect()->route('service-profile')->with('error', 'Failed to delete Service Profile: ' . $e->getMessage());

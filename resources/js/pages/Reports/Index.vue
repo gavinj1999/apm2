@@ -1,573 +1,809 @@
+<!-- resources/js/Pages/ServiceProfile/Index.vue -->
 <template>
-    <AppLayout>
-      <div class="p-6 bg-gray-900 text-gray-100 min-h-screen">
-        <!-- Page Title -->
-        <h1 class="text-3xl font-bold mb-8 tracking-tight">Delivery Reports</h1>
+    <AppLayout :breadcrumbs="Reports">
+        <div class="p-6 bg-gray-900 text-gray-100 min-h-screen">
+            <h1 class="text-3xl font-bold mb-8 tracking-tight">Service Profiles</h1>
 
-        <!-- Flash Messages -->
-        <div v-if="$page.props.flash.success" class="bg-green-600 text-white p-4 mb-6 rounded-lg shadow-lg transition-all duration-300">
-          {{ $page.props.flash.success }}
-        </div>
-        <div v-if="$page.props.flash.error" class="bg-red-600 text-white p-4 mb-6 rounded-lg shadow-lg transition-all duration-300">
-          {{ $page.props.flash.error }}
-        </div>
+            <!-- Flash Messages -->
+            <div v-if="$page.props.flash.success" class="bg-green-600 text-white p-4 mb-6 rounded-lg shadow-lg transition-all duration-300">
+                {{ $page.props.flash.success }}
+            </div>
+            <div v-if="$page.props.flash.error" class="bg-red-600 text-white p-4 mb-6 rounded-lg shadow-lg transition-all duration-300">
+                {{ $page.props.flash.error }}
+            </div>
+            <div v-if="$page.props.error" class="bg-red-600 text-white p-4 mb-6 rounded-lg shadow-lg transition-all duration-300">
+                {{ $page.props.error }}
+            </div>
 
-        <!-- Filters -->
-        <div class="bg-gray-800 rounded-lg shadow-md p-6 mb-8">
-          <h2 class="text-xl font-semibold mb-4 text-gray-100">Report Filters</h2>
-          <form @submit.prevent="fetchReport" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <!-- Period Filter -->
-            <div class="relative">
-              <label for="periods" class="block mb-2 font-medium text-gray-300 text-lg">Select Periods</label>
-              <button
-                @click="toggleDropdown"
-                class="w-full p-3 bg-gray-800 border border-gray-700 text-gray-100 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 flex justify-between items-center"
-              >
-                <span>{{ selectedPeriodLabels.length ? selectedPeriodLabels.join(', ') : 'Select Periods' }}</span>
-                <svg
-                  class="w-5 h-5 text-gray-400 transition-transform duration-200"
-                  :class="{ 'rotate-180': isDropdownOpen }"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-              </button>
-              <div
-                v-if="isDropdownOpen"
-                class="absolute z-10 mt-2 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto"
-              >
-                <div class="p-2">
-                  <label
-                    v-for="(label, periodId) in availablePeriods"
-                    :key="periodId"
-                    class="flex items-center p-3 hover:bg-gray-700 rounded-md cursor-pointer transition-all duration-200"
-                  >
-                    <input
-                      type="checkbox"
-                      :value="periodId"
-                      v-model="selectedPeriods"
-                      class="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
-                    />
-                    <span class="ml-3 text-gray-100 text-sm">{{ label }}</span>
-                  </label>
+            <!-- Round Selection -->
+            <div class="mb-6">
+                <label for="active_round" class="block mb-2 font-medium text-gray-300">Select Active Round</label>
+                <select v-model="activeRound" id="active_round" class="w-full max-w-xs p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" @change="loadProfilesForRound">
+                    <option v-for="(name, id) in rounds" :key="id" :value="id">{{ name }}</option>
+                </select>
+            </div>
+
+            <!-- Service Profiles List -->
+            <div v-if="filteredProfiles.length" class="mb-6">
+                <h2 class="text-2xl font-semibold mb-4">Service Profiles for Selected Round</h2>
+                <div class="bg-gray-800 rounded-lg shadow-md p-4">
+                    <ul class="space-y-2">
+                        <li v-for="profile in filteredProfiles" :key="profile.id" class="flex justify-between items-center p-2 bg-gray-700 rounded-lg">
+                            <span>Profile #{{ profile.id }} (Fuel Cost: £{{ profile.fuel_cost_per_unit }} | Total Cost: £{{ calculateTotalCost(profile).toFixed(2) }})</span>
+                            <button @click="editProfile(profile.id)" class="px-4 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 transition-all duration-200">
+                                Edit
+                            </button>
+                        </li>
+                    </ul>
                 </div>
-              </div>
             </div>
-            <!-- Round Filter -->
-            <div>
-              <label for="rounds" class="block mb-2 font-medium text-gray-300 text-lg">Select Round</label>
-              <select
-                v-model="selectedRoundId"
-                class="w-full p-3 bg-gray-800 border border-gray-700 text-gray-100 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">All Rounds</option>
-                <option v-for="round in rounds" :key="round.id" :value="round.id">
-                  {{ round.name }}
-                </option>
-              </select>
-            </div>
-            <!-- Parcel Type Filter -->
-            <div>
-              <label for="parcel_types" class="block mb-2 font-medium text-gray-300 text-lg">Select Parcel Type</label>
-              <select
-                v-model="selectedParcelTypeId"
-                class="w-full p-3 bg-gray-800 border border-gray-700 text-gray-100 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">All Parcel Types</option>
-                <option v-for="type in parcelTypes" :key="type.id" :value="type.id">
-                  {{ type.name }}
-                </option>
-              </select>
-            </div>
-            <!-- Submit Button -->
-            <div class="flex items-end">
-              <button
-                type="submit"
-                class="w-full p-3 bg-blue-500 text-white rounded-lg shadow-sm hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 transition-all duration-200"
-                :disabled="isLoading"
-              >
-                Generate Report
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <!-- Export Button -->
-        <div class="mb-8">
-          <button
-            @click="exportToCsv"
-            class="p-3 bg-green-500 text-white rounded-lg shadow-sm hover:bg-green-600 focus:ring-2 focus:ring-green-500 transition-all duration-200"
-            :disabled="isLoading || !totalSummary.total_parcels"
-          >
-            Export to CSV
-          </button>
-        </div>
-
-        <!-- Loading State -->
-        <div v-if="isLoading" class="flex justify-center items-center mb-8">
-          <span class="text-gray-100 text-lg">Loading...</span>
-        </div>
-
-        <!-- Charts and Report Data -->
-        <div v-else class="space-y-8">
-          <!-- Charts -->
-          <div class="mb-8 flex space-x-4">
-            <!-- Income and Profit Summary Bar Chart (50% width) -->
-            <div class="w-1/2 h-[400px] bg-gray-800 rounded-lg shadow-md p-6">
-              <h2 class="text-xl font-semibold mb-4 text-gray-100 tracking-tight">Income and Profit Summary by Period</h2>
-              <div v-if="!isBarChartDataValid" class="text-gray-400 text-center italic">
-                No income data available for any periods.
-              </div>
-              <BarChartCanvas v-else-if="isChartDataReady" :chart-data="barChartData" :options="barChartOptions" />
-            </div>
-            <!-- Income Trend Line Chart (50% width) -->
-            <div class="w-1/2 h-[400px] bg-gray-800 rounded-lg shadow-md p-6">
-              <h2 class="text-xl font-semibold mb-4 text-gray-100 tracking-tight">Income Trend Over Time</h2>
-              <div v-if="!isLineChartDataValid" class="text-gray-400 text-center italic">
-                No income data available for selected periods.
-              </div>
-              <LineChartCanvas v-else-if="isChartDataReady" :chart-data="lineChartData" :options="lineChartOptions" />
-            </div>
-          </div>
-          <!-- Parcel Type Pie Chart -->
-          <div class="h-[400px] bg-gray-800 rounded-lg shadow-md p-6 flex flex-col items-center">
-            <h2 class="text-xl font-semibold mb-4 text-gray-100 tracking-tight">Parcel Type Distribution</h2>
-            <div v-if="!isPieChartDataValid" class="text-gray-400 text-center italic">
-              No parcel type data available for selected periods. Try selecting a different period.
-            </div>
-            <PieChartCanvas v-else-if="isChartDataReady" :chart-data="pieChartData" :options="pieChartOptions" />
-          </div>
-
-          <!-- Report Data -->
-          <div v-if="Object.keys(reportData).length === 0 && totalSummary.total_parcels === 0" class="text-gray-400 text-center italic py-8 bg-gray-800 rounded-lg shadow-md">
-            No data available for the selected periods. Try selecting a different period.
-          </div>
-          <div v-else class="space-y-6">
-            <!-- Total Summary Card -->
-            <div v-if="totalSummary.total_parcels > 0" class="bg-gray-800 rounded-lg shadow-md p-6 transition-all duration-200 hover:shadow-lg">
-              <h2 class="text-xl font-semibold mb-4 text-gray-100 tracking-tight">
-                {{ totalSummary.name }} - {{ totalSummary.period_name }}
-              </h2>
-              <div class="overflow-x-auto mb-6">
-                <table class="min-w-full table-auto border-separate border-spacing-0">
-                  <thead>
-                    <tr class="bg-gray-700 text-gray-300 text-sm uppercase tracking-wider">
-                      <th class="py-3 px-6 text-left rounded-tl-lg">Metric</th>
-                      <th class="py-3 px-6 text-left rounded-tr-lg">Value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr class="border-t border-gray-700 hover:bg-gray-700 transition-colors">
-                      <td class="py-3 px-6 text-gray-100 font-medium">Total Parcels</td>
-                      <td class="py-3 px-6 text-gray-100">{{ totalSummary.total_parcels }}</td>
-                    </tr>
-                    <tr class="border-t border-gray-700 hover:bg-gray-700 transition-colors">
-                      <td class="py-3 px-6 text-gray-100 font-medium">Total Income (£)</td>
-                      <td class="py-3 px-6 text-gray-100">{{ totalSummary.total_income.toFixed(2) }}</td>
-                    </tr>
-                    <tr class="border-t border-gray-700 hover:bg-gray-700 transition-colors">
-                      <td class="py-3 px-6 text-gray-100 font-medium">Total Cost (£)</td>
-                      <td class="py-3 px-6 text-gray-100">{{ totalSummary.total_cost.toFixed(2) }}</td>
-                    </tr>
-                    <tr class="border-t border-gray-700 hover:bg-gray-700 transition-colors">
-                      <td class="py-3 px-6 text-gray-100 font-medium">Total Profit (£)</td>
-                      <td class="py-3 px-6 text-gray-100" :class="totalSummary.total_profit >= 0 ? 'text-green-400' : 'text-red-400'">
-                        {{ totalSummary.total_profit.toFixed(2) }}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div class="overflow-x-auto">
-                <h3 class="text-lg font-medium mb-3 text-gray-300 tracking-tight">Packet Type Breakdown</h3>
-                <table class="min-w-full table-auto border-separate border-spacing-0">
-                  <thead>
-                    <tr class="bg-gray-700 text-gray-300 text-sm uppercase tracking-wider">
-                      <th class="py-3 px-6 text-left rounded-tl-lg">Packet Type</th>
-                      <th class="py-3 px-6 text-left">Total Parcels</th>
-                      <th class="py-3 px-6 text-left">Income (£)</th>
-                      <th class="py-3 px-6 text-left rounded-tr-lg">Percentage</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="(packet, index) in totalSummary.packet_types"
-                      :key="index"
-                      class="border-t border-gray-700 hover:bg-gray-700 transition-colors"
-                    >
-                      <td class="py-3 px-6 text-gray-100">{{ packet.name }}</td>
-                      <td class="py-3 px-6 text-gray-100">{{ packet.total }}</td>
-                      <td class="py-3 px-6 text-gray-100">{{ packet.income.toFixed(2) }}</td>
-                      <td class="py-3 px-6 text-gray-100">{{ packet.percentage.toFixed(2) }}%</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+            <div v-else-if="activeRound" class="mb-6 text-gray-400">
+                No service profiles found for this round. Create a new one below.
             </div>
 
-            <!-- Per Round and Period Cards (Collapsible) -->
-            <div v-if="reportData.length > 0" class="bg-gray-800 rounded-lg shadow-md p-6 transition-all duration-200 hover:shadow-lg">
-              <button
-                @click="toggleRoundSummaries"
-                class="w-full flex justify-between items-center text-xl font-semibold text-gray-100 tracking-tight focus:outline-none"
-              >
-                <span>Round Summaries</span>
-                <svg
-                  class="w-6 h-6 text-gray-400 transition-transform duration-200"
-                  :class="{ 'rotate-180': areRoundSummariesExpanded }"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-              </button>
-              <div v-if="areRoundSummariesExpanded" class="mt-4 space-y-6">
-                <div v-for="(data, index) in reportData" :key="`${data.round_id}-${data.period_id}`" class="border-t border-gray-700 pt-4">
-                  <h2 class="text-lg font-semibold mb-4 text-gray-100 tracking-tight">
-                    {{ data.name }} - {{ data.period_name }}
-                  </h2>
-                  <div class="overflow-x-auto mb-6">
-                    <table class="min-w-full table-auto border-separate border-spacing-0">
-                      <thead>
-                        <tr class="bg-gray-700 text-gray-300 text-sm uppercase tracking-wider">
-                          <th class="py-3 px-6 text-left rounded-tl-lg">Metric</th>
-                          <th class="py-3 px-6 text-left rounded-tr-lg">Value</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr class="border-t border-gray-700 hover:bg-gray-700 transition-colors">
-                          <td class="py-3 px-6 text-gray-100 font-medium">Total Parcels</td>
-                          <td class="py-3 px-6 text-gray-100">{{ data.total_parcels }}</td>
-                        </tr>
-                        <tr class="border-t border-gray-700 hover:bg-gray-700 transition-colors">
-                          <td class="py-3 px-6 text-gray-100 font-medium">Total Income (£)</td>
-                          <td class="py-3 px-6 text-gray-100">{{ data.total_income.toFixed(2) }}</td>
-                        </tr>
-                        <tr class="border-t border-gray-700 hover:bg-gray-700 transition-colors">
-                          <td class="py-3 px-6 text-gray-100 font-medium">Total Cost (£)</td>
-                          <td class="py-3 px-6 text-gray-100">{{ data.total_cost.toFixed(2) }}</td>
-                        </tr>
-                        <tr class="border-t border-gray-700 hover:bg-gray-700 transition-colors">
-                          <td class="py-3 px-6 text-gray-100 font-medium">Total Profit (£)</td>
-                          <td class="py-3 px-6 text-gray-100" :class="data.total_profit >= 0 ? 'text-green-400' : 'text-red-400'">
-                            {{ data.total_profit.toFixed(2) }}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <div class="overflow-x-auto">
-                    <h3 class="text-lg font-medium mb-3 text-gray-300 tracking-tight">Packet Type Breakdown</h3>
-                    <table class="min-w-full table-auto border-separate border-spacing-0">
-                      <thead>
-                        <tr class="bg-gray-700 text-gray-300 text-sm uppercase tracking-wider">
-                          <th class="py-3 px-6 text-left rounded-tl-lg">Packet Type</th>
-                          <th class="py-3 px-6 text-left">Total Parcels</th>
-                          <th class="py-3 px-6 text-left">Income (£)</th>
-                          <th class="py-3 px-6 text-left rounded-tr-lg">Percentage</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr
-                          v-for="(packet, index) in data.packet_types"
-                          :key="index"
-                          class="border-t border-gray-700 hover:bg-gray-700 transition-colors"
-                        >
-                          <td class="py-3 px-6 text-gray-100">{{ packet.name }}</td>
-                          <td class="py-3 px-6 text-gray-100">{{ packet.total }}</td>
-                          <td class="py-3 px-6 text-gray-100">{{ packet.income.toFixed(2) }}</td>
-                          <td class="py-3 px-6 text-gray-100">{{ packet.percentage.toFixed(2) }}%</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+            <!-- Cost Summary -->
+            <div v-if="form.id || tempLocations.length" class="mb-6 bg-gray-800 rounded-lg shadow-md p-4">
+                <h2 class="text-xl font-semibold mb-4">Cost Summary</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <p class="font-medium text-gray-300">Total Fuel Cost:</p>
+                        <p class="text-lg">£{{ totalFuelCost.toFixed(2) }}</p>
+                    </div>
+                    <div>
+                        <p class="font-medium text-gray-300">Loading Time Cost:</p>
+                        <p class="text-lg">£{{ loadingTimeCost.toFixed(2) }}</p>
+                    </div>
+                    <div>
+                        <p class="font-medium text-gray-300">Total Cost:</p>
+                        <p class="text-lg">£{{ totalCost.toFixed(2) }}</p>
+                    </div>
                 </div>
-              </div>
+                <!-- Cost Chart -->
+                <div class="mt-4">
+                    <h3 class="text-lg font-medium text-gray-300 mb-Tooltip: To use the chart, ensure Chart.js is included in your project. You can add it via CDN in your layout or install it via npm.
+                    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                </div>
             </div>
-          </div>
+
+            <!-- Service Profile Form -->
+            <div v-if="!$page.props.error" class="bg-gray-800 rounded-lg shadow-md p-4">
+                <form @submit.prevent="submitForm">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="mb-4">
+                            <label for="round_id" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Associated Round</label>
+                            <select v-model="form.round_id" id="round_id" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required :disabled="isEditing">
+                                <option v-for="(name, id) in rounds" :key="id" :value="id">{{ name }}</option>
+                            </select>
+                        </div>
+                        <div class="mb-4">
+                            <label for="fuel_cost_per_unit" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Fuel Cost Per Unit (£)</label>
+                            <input type="number" step="0.01" v-model="form.fuel_cost_per_unit" id="fuel_cost_per_unit" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required min="0" @input="validateInput('fuel_cost_per_unit')" />
+                            <p v-if="formErrors.fuel_cost_per_unit" class="text-red-400 text-sm mt-1">{{ formErrors.fuel_cost_per_unit }}</p>
+                        </div>
+                        <div class="mb-4">
+                            <label for="distance_unit" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Distance Unit</label>
+                            <select v-model="form.distance_unit" id="distance_unit" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
+                                <option value="mile">Mile</option>
+                                <option value="km">Kilometer</option>
+                            </select>
+                        </div>
+                        <div class="mb-4">
+                            <label for="distance_home_to_work" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Distance Home to Work (miles)</label>
+                            <input type="number" step="0.01" v-model="form.distance_home_to_work" id="distance_home_to_work" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required readonly />
+                        </div>
+                        <div class="mb-4">
+                            <label for="distance_work_to_start" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Distance Work to Start Location (miles)</label>
+                            <input type="number" step="0.01" v-model="form.distance_work_to_start" id="distance_work_to_start" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required readonly />
+                        </div>
+                        <div class="mb-4">
+                            <label for="distance_end_to_home" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Distance End Location to Home (miles)</label>
+                            <input type="number" step="0.01" v-model="form.distance_end_to_home" id="distance_end_to_home" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required readonly />
+                        </div>
+                        <div class="mb-4">
+                            <label for="loading_time_cost_per_hour" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Loading Time Cost Per Hour (£)</label>
+                            <input type="number" step="0.01" v-model="form.loading_time_cost_per_hour" id="loading_time_cost_per_hour" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required min="0" @input="validateInput('loading_time_cost_per_hour')" />
+                            <p v-if="formErrors.loading_time_cost_per_hour" class="text-red-400 text-sm mt-1">{{ formErrors.loading_time_cost_per_hour }}</p>
+                        </div>
+                        <div class="mb-4">
+                            <label for="loading_time_hours" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Loading Time (Hours)</label>
+                            <input type="number" step="0.01" v-model="form.loading_time_hours" id="loading_time_hours" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required min="0" @input="validateInput('loading_time_hours')" />
+                            <p v-if="formErrors.loading_time_hours" class="text-red-400 text-sm mt-1">{{ formErrors.loading_time_hours }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Work Location Selection -->
+                    <div class="mb-4">
+                        <label for="work_location" class="block mb-2 font-medium text-gray-300">Select Work Location (Depot)</label>
+                        <select v-model="selectedWorkLocation" id="work_location" class="w-full max-w-md p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" @change="setWorkLocation">
+                            <option value="">Select a Work Location</option>
+                            <option v-for="location in workLocations" :key="location.id" :value="location.id">
+                                {{ location.name }} ({{ location.address }})
+                            </option>
+                        </select>
+                    </div>
+
+                    <!-- Map Section -->
+                    <div class="mb-4">
+                        <label class="block mb-2 font-medium text-gray-300">Set Locations on Map</label>
+                        <div v-if="isRecalculating" class="bg-yellow-600 text-white p-2 rounded-lg mb-2 text-center transition-opacity duration-300">
+                            Recalculating Distances...
+                        </div>
+                        <div ref="map" class="w-full h-96 bg-gray-700 rounded-lg"></div>
+                        <p class="mt-2 text-sm text-gray-400">
+                            Click the map to set Home, Start, and End locations in that order. Work location is set via the dropdown above.
+                            <span v-if="!form.id" class="text-yellow-400">Note: Locations will be saved after you save the profile.</span>
+                        </p>
+                        <div class="mt-2">
+                            <button type="button" @click="clearPins" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500 transition-all duration-200" :disabled="isClearing">
+                                {{ isClearing ? 'Clearing...' : clearFeedback || 'Clear Pins' }}
+                            </button>
+                            <div v-if="moveFeedback" class="mt-2 w-full bg-green-600 text-white p-2 rounded-lg text-center text-lg font-semibold transition-opacity duration-300">
+                                {{ moveFeedback }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="flex justify-between">
+                        <div v-if="isEditing">
+                            <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200">
+                                Update Profile
+                            </button>
+                            <button type="button" @click="deleteProfile" class="ml-4 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200">
+                                Delete Profile
+                            </button>
+                        </div>
+                        <div v-else>
+                            <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200">
+                                Save Profile
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
         </div>
-      </div>
     </AppLayout>
-  </template>
+</template>
 
-  <script setup lang="ts">
-  import { ref, watch, computed, onMounted, nextTick } from 'vue';
-  import { router } from '@inertiajs/vue3';
-  import AppLayout from '@/layouts/AppLayout.vue';
-  import BarChartCanvas from '@/components/BarChartCanvas.vue';
-  import PieChartCanvas from '@/components/PieChartCanvas.vue';
-  import LineChartCanvas from '@/components/LineChartCanvas.vue';
-  import { toRaw } from 'vue';
+<script setup>
+import { reactive, ref, computed, onMounted, onUnmounted } from 'vue';
+import { router } from '@inertiajs/vue3';
+import mapboxgl from 'mapbox-gl';
+import AppLayout from '@/layouts/AppLayout.vue';
+import axios from 'axios';
 
-  const props = defineProps({
-    availablePeriods: Object,
-    selectedPeriods: Array,
-    reportData: Object,
-    totalSummary: Object,
-    incomeByPeriod: Array,
-    pieChartData: Object,
-    rounds: Array,
-    parcelTypes: Array,
+const props = defineProps({
+    serviceProfiles: Array,
+    profile: Object,
+    rounds: Object,
     flash: Object,
-  });
-
-  const selectedPeriods = ref(props.selectedPeriods);
-  const selectedRoundId = ref('');
-  const selectedParcelTypeId = ref('');
-  const isLoading = ref(false);
-  const isDropdownOpen = ref(false);
-  const areRoundSummariesExpanded = ref(false);
-  const isBarChartDataValid = ref(false);
-  const isPieChartDataValid = ref(false);
-  const isLineChartDataValid = ref(false);
-  const isChartDataReady = ref(false);
-  const barChartData = ref({
-    labels: [],
-    datasets: [],
-  });
-  const pieChartData = ref({
-    labels: [],
-    datasets: [],
-  });
-  const lineChartData = ref({
-    labels: [],
-    datasets: [],
-  });
-
-  // Compute the labels of selected periods for display
-  const selectedPeriodLabels = computed(() => {
-    return selectedPeriods.value.map(periodId => props.availablePeriods[periodId]);
-  });
-
-  // Initialize chart data
-  const updateChartData = async () => {
-    await nextTick();
-
-    // Bar Chart Data (Income and Profit)
-    const incomeByPeriod = Array.isArray(props.incomeByPeriod) ? props.incomeByPeriod : [];
-    const barLabels = incomeByPeriod.map(item => item.period_name || 'Unknown');
-    const incomeDataValues = incomeByPeriod.map(item => item.income || 0);
-    const profitDataValues = incomeByPeriod.map(item => item.profit || 0);
-    barChartData.value = {
-      labels: barLabels,
-      datasets: [
-        {
-          label: 'Income (£)',
-          backgroundColor: '#3B82F6',
-          data: incomeDataValues,
-        },
-        {
-          label: 'Profit (£)',
-          backgroundColor: '#10B981',
-          data: profitDataValues,
-        },
-      ],
-    };
-    isBarChartDataValid.value = barLabels.length > 0 && (incomeDataValues.some(val => val > 0) || profitDataValues.some(val => val !== 0));
-
-    // Pie Chart Data
-    const pieDataRaw = toRaw(props.pieChartData) || { labels: [], data: [] };
-    const pieLabels = Array.isArray(pieDataRaw.labels) ? [...pieDataRaw.labels] : [];
-    const pieDataValues = Array.isArray(pieDataRaw.data) ? [...pieDataRaw.data] : [];
-    pieChartData.value = {
-      labels: pieLabels,
-      datasets: [
-        {
-          backgroundColor: [
-            '#3B82F6',
-            '#EF4444',
-            '#10B981',
-            '#F59E0B',
-            '#8B5CF6',
-            '#EC4899',
-            '#14B8A6',
-            '#F97316',
-          ],
-          data: pieDataValues,
-        },
-      ],
-    };
-    isPieChartDataValid.value = pieLabels.length > 0 && pieDataValues.length > 0;
-
-    // Line Chart Data (Income Trend)
-    const filteredManifests = Array.isArray(props.reportData) ? props.reportData : [];
-    const lineLabels = filteredManifests.map(entry => entry.period_name).filter((v, i, a) => a.indexOf(v) === i); // Unique period names
-    const lineDataValues = lineLabels.map(periodName => {
-      return filteredManifests
-        .filter(entry => entry.period_name === periodName)
-        .reduce((sum, entry) => sum + entry.total_income, 0);
-    });
-    lineChartData.value = {
-      labels: lineLabels,
-      datasets: [
-        {
-          label: 'Income (£)',
-          borderColor: '#3B82F6',
-          backgroundColor: 'rgba(59, 130, 246, 0.1)',
-          data: lineDataValues,
-          fill: true,
-        },
-      ],
-    };
-    isLineChartDataValid.value = lineLabels.length > 0 && lineDataValues.some(val => val > 0);
-
-    // Mark the chart data as ready
-    isChartDataReady.value = true;
-  };
-
-  // Chart Options
-  const barChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      y: {
-        beginAtZero: true,
-        title: {
-          display: true,
-          text: 'Amount (£)',
-          color: '#D1D5DB',
-        },
-        ticks: { color: '#D1D5DB' },
-        grid: { color: '#4B5563' },
-      },
-      x: {
-        title: {
-          display: true,
-          text: 'Period',
-          color: '#D1D5DB',
-        },
-        ticks: { color: '#D1D5DB' },
-        grid: { color: '#4B5563' },
-      },
+    initialLocations: Array,
+    mapboxAccessToken: String,
+    isEditing: {
+        type: Boolean,
+        default: false,
     },
-    plugins: {
-      legend: { labels: { color: '#D1D5DB' } },
-      tooltip: { backgroundColor: '#1F2937', titleColor: '#D1D5DB', bodyColor: '#D1D5DB' },
-    },
-  };
+    error: String,
+});
 
-  const pieChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'right',
-        labels: { color: '#D1D5DB', padding: 20, font: { size: 14 }, boxWidth: 20 },
-      },
-      tooltip: { backgroundColor: '#1F2937', titleColor: '#D1D5DB', bodyColor: '#D1D5DB' },
-    },
-  };
+// Form state
+const form = reactive({
+    id: props.profile?.id || null,
+    round_id: props.profile?.round_id || Object.keys(props.rounds)[0] || null,
+    fuel_cost_per_unit: props.profile?.fuel_cost_per_unit || 0,
+    distance_unit: props.profile?.distance_unit || 'mile',
+    distance_home_to_work: props.profile?.distance_home_to_work || 0,
+    distance_work_to_start: props.profile?.distance_work_to_start || 0,
+    distance_end_to_home: props.profile?.distance_end_to_home || 0,
+    loading_time_cost_per_hour: props.profile?.loading_time_cost_per_hour || 0,
+    loading_time_hours: props.profile?.loading_time_hours || 0,
+});
 
-  const lineChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      y: {
-        beginAtZero: true,
-        title: { display: true, text: 'Income (£)', color: '#D1D5DB' },
-        ticks: { color: '#D1D5DB' },
-        grid: { color: '#4B5563' },
-      },
-      x: {
-        title: { display: true, text: 'Period', color: '#D1D5DB' },
-        ticks: { color: '#D1D5DB' },
-        grid: { color: '#4B5563' },
-      },
-    },
-    plugins: {
-      legend: { labels: { color: '#D1D5DB' } },
-      tooltip: { backgroundColor: '#1F2937', titleColor: '#D1D5DB', bodyColor: '#D1D5DB' },
-    },
-  };
+// Form errors for validation
+const formErrors = reactive({
+    fuel_cost_per_unit: '',
+    loading_time_cost_per_hour: '',
+    loading_time_hours: '',
+});
 
-  // Export to CSV
-  const exportToCsv = () => {
-    const headers = ['Period,Round,Total Parcels,Total Income (£),Total Cost (£),Total Profit (£)'];
-    const rows = props.reportData.map(entry =>
-      `${entry.period_name},${entry.name},${entry.total_parcels},${entry.total_income.toFixed(2)},${entry.total_cost.toFixed(2)},${entry.total_profit.toFixed(2)}`
-    );
-    const csvContent = headers.concat(rows).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `delivery_report_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-  };
+// Map and location state
+const map = ref(null);
+const mapInstance = ref(null);
+const locations = ref(props.initialLocations || []);
+const tempLocations = ref([]);
+const tempMarkers = ref([]);
+const markers = ref([]);
+const isClearing = ref(false);
+const clearFeedback = ref('');
+const moveFeedback = ref('');
+const isRecalculating = ref(false);
+const activeRound = ref(Object.keys(props.rounds)[0] || null);
+const filteredProfiles = ref([]);
+const workLocations = ref([]);
+const selectedWorkLocation = ref(null);
 
-  // Fetch report with filters
-  const fetchReport = () => {
-    isLoading.value = true;
-    areRoundSummariesExpanded.value = false;
-    router.get('/reports', {
-      periods: selectedPeriods.value,
-      round_id: selectedRoundId.value,
-      parcel_type_id: selectedParcelTypeId.value,
-    }, {
-      preserveState: true,
-      onFinish: () => {
-        isLoading.value = false;
-        updateChartData();
-      },
-    });
-  };
+mapboxgl.accessToken = props.mapboxAccessToken;
 
-  // Debug chart data
-  watch(() => [props.incomeByPeriod, props.pieChartData, props.reportData], () => {
-    isChartDataReady.value = false;
-    updateChartData();
-  }, { immediate: true });
+const markerColors = {
+    Home: '#22C55E',
+    Work: '#3B82F6',
+    'Start Location': '#F59E0B',
+    'End Location': '#EF4444',
+};
 
-  // Watch for filter changes
-  watch([selectedPeriods, selectedRoundId, selectedParcelTypeId], () => {
-    fetchReport();
-  });
+const locationNames = ['Home', 'Start Location', 'End Location'];
 
-  // Close dropdown when clicking outside
-  const closeDropdown = (event: Event) => {
-    if (!(event.target as HTMLElement).closest('.relative')) {
-      isDropdownOpen.value = false;
+// Cost calculations
+const totalFuelCost = computed(() => {
+    const totalDistance = 
+        Number(form.distance_home_to_work || 0) +
+        Number(form.distance_work_to_start || 0) +
+        Number(form.distance_end_to_home || 0);
+    return (totalDistance * Number(form.fuel_cost_per_unit || 0)).toFixed(2);
+});
+
+const loadingTimeCost = computed(() => {
+    return (Number(form.loading_time_hours || 0) * Number(form.loading_time_cost_per_hour || 0)).toFixed(2);
+});
+
+const totalCost = computed(() => {
+    return (Number(totalFuelCost.value) + Number(loadingTimeCost.value)).toFixed(2);
+});
+
+// Calculate total cost for a profile (used in profile list)
+const calculateTotalCost = (profile) => {
+    const totalDistance = 
+        Number(profile.distance_home_to_work || 0) +
+        Number(profile.distance_work_to_start || 0) +
+        Number(profile.distance_end_to_home || 0);
+    const fuelCost = totalDistance * Number(profile.fuel_cost_per_unit || 0);
+    const loadingCost = Number(profile.loading_time_hours || 0) * Number(profile.loading_time_cost_per_hour || 0);
+    return fuelCost + loadingCost;
+};
+
+// Input validation
+const validateInput = (field) => {
+    formErrors[field] = '';
+    if (form[field] < 0) {
+        formErrors[field] = `${field.replace(/_/g, ' ')} cannot be negative`;
+        form[field] = 0;
+    } else if (form[field] > 1000) {
+        formErrors[field] = `${field.replace(/_/g, ' ')} is too large`;
+        form[field] = 1000;
     }
-  };
+};
 
-  // Add event listener to close dropdown on outside click
-  watch(isDropdownOpen, (newValue) => {
-    if (newValue) {
-      document.addEventListener('click', closeDropdown);
+// Haversine formula
+const haversineDistance = (coord1, coord2) => {
+    const toRadians = (degrees) => (degrees * Math.PI) / 180;
+    const R = form.distance_unit === 'mile' ? 3958.8 : 6371; // Earth's radius in miles or km
+    const dLat = toRadians(coord2.latitude - coord1.latitude);
+    const dLng = toRadians(coord2.longitude - coord1.longitude);
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRadians(coord1.latitude)) * Math.cos(toRadians(coord2.latitude)) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+};
+
+// Fetch CSRF token
+const fetchCsrfToken = async () => {
+    try {
+        await axios.get('/sanctum/csrf-cookie');
+        return true;
+    } catch (error) {
+        console.error('Error fetching CSRF token:', error);
+        return false;
+    }
+};
+
+// Fetch work locations
+const fetchWorkLocations = async () => {
+    try {
+        const response = await axios.get('/api/work-locations');
+        workLocations.value = response.data;
+    } catch (error) {
+        console.error('Error fetching work locations:', error);
+        alert('Failed to fetch work locations: ' + (error.response?.data?.error || error.message || 'Unknown error'));
+    }
+};
+
+// Create custom marker
+const createCustomMarkerElement = (name, color) => {
+    const el = document.createElement('div');
+    el.className = 'custom-marker';
+    el.style.backgroundColor = color;
+    el.style.color = 'white';
+    el.style.padding = '4px 8px';
+    el.style.borderRadius = '4px';
+    el.style.fontSize = '12px';
+    el.style.fontWeight = 'bold';
+    el.style.textAlign = 'center';
+    el.style.whiteSpace = 'nowrap';
+    el.innerText = name;
+    return el;
+};
+
+// Recalculate distances
+const recalculateDistances = () => {
+    isRecalculating.value = true;
+    const home = locations.value.find((loc) => loc.name === 'Home') || tempLocations.value.find((loc) => loc.name === 'Home');
+    const work = locations.value.find((loc) => loc.name === 'Work') || tempLocations.value.find((loc) => loc.name === 'Work');
+    const start = locations.value.find((loc) => loc.name === 'Start Location') || tempLocations.value.find((loc) => loc.name === 'Start Location');
+    const end = locations.value.find((loc) => loc.name === 'End Location') || tempLocations.value.find((loc) => loc.name === 'End Location');
+
+    form.distance_home_to_work = (home && work) ? haversineDistance(home, work).toFixed(2) : 0;
+    form.distance_work_to_start = (work && start) ? haversineDistance(work, start).toFixed(2) : 0;
+    form.distance_end_to_home = (end && home) ? haversineDistance(end, home).toFixed(2) : 0;
+
+    setTimeout(() => { isRecalculating.value = false; }, 500);
+};
+
+// Set work location
+const setWorkLocation = async () => {
+    if (!selectedWorkLocation.value) return;
+    const workLocation = workLocations.value.find(loc => loc.id === selectedWorkLocation.value);
+    if (!workLocation) return;
+
+    try {
+        if (!(await fetchCsrfToken())) {
+            alert('Failed to initialize request. Please refresh the page.');
+            return;
+        }
+
+        const existingWork = locations.value.find(loc => loc.name === 'Work');
+        if (existingWork) {
+            await axios.delete(`/api/locations/${existingWork.id}`, {
+                params: { service_profile_id: form.id },
+            });
+            const markerIndex = markers.value.findIndex(marker => marker.getElement().innerText === 'Work');
+            if (markerIndex !== -1) {
+                markers.value[markerIndex].remove();
+                markers.value.splice(markerIndex, 1);
+            }
+            locations.value = locations.value.filter(loc => loc.name !== 'Work');
+        } else {
+            const tempWorkIndex = tempLocations.value.findIndex(loc => loc.name === 'Work');
+            if (tempWorkIndex !== -1) {
+                tempMarkers.value[tempWorkIndex].remove();
+                tempMarkers.value.splice(tempWorkIndex, 1);
+                tempLocations.value.splice(tempWorkIndex, 1);
+            }
+        }
+
+        if (form.id) {
+            const response = await axios.post('/api/locations', {
+                name: 'Work',
+                latitude: workLocation.latitude,
+                longitude: workLocation.longitude,
+                service_profile_id: form.id,
+            });
+            const newLocation = response.data;
+            locations.value.push(newLocation);
+
+            const markerElement = createCustomMarkerElement('Work', markerColors['Work']);
+            const marker = new mapboxgl.Marker({ element: markerElement, draggable: true })
+                .setLngLat([workLocation.longitude, workLocation.latitude])
+                .addTo(mapInstance.value);
+
+            marker.on('dragend', async () => {
+                const { lng, lat } = marker.getLngLat();
+                await updateLocationPosition(newLocation.id, lat, lng);
+            });
+
+            markers.value.push(marker);
+        } else {
+            const tempLocation = {
+                name: 'Work',
+                latitude: workLocation.latitude,
+                longitude: workLocation.longitude,
+            };
+            tempLocations.value.push(tempLocation);
+
+            const markerElement = createCustomMarkerElement('Work', markerColors['Work']);
+            const marker = new mapboxgl.Marker({ element: markerElement, draggable: true })
+                .setLngLat([workLocation.longitude, workLocation.latitude])
+                .addTo(mapInstance.value);
+
+            marker.on('dragend', () => {
+                const { lng, lat } = marker.getLngLat();
+                const tempIndex = tempLocations.value.findIndex(loc => loc.name === 'Work');
+                if (tempIndex !== -1) {
+                    tempLocations.value[tempIndex].latitude = lat;
+                    tempLocations.value[tempIndex].longitude = lng;
+                }
+                recalculateDistances();
+            });
+
+            tempMarkers.value.push(marker);
+        }
+
+        recalculateDistances();
+    } catch (error) {
+        console.error('Error setting Work location:', error);
+        alert('Failed to set Work location: ' + (error.response?.data?.error || error.message || 'Unknown error'));
+    }
+};
+
+// Update location position
+const updateLocationPosition = async (locationId, latitude, longitude) => {
+    try {
+        if (!(await fetchCsrfToken())) {
+            alert('Failed to initialize request. Please refresh the page.');
+            return false;
+        }
+
+        const response = await axios.put(`/api/locations/${locationId}`, {
+            latitude,
+            longitude,
+        }, {
+            params: { service_profile_id: form.id },
+        });
+
+        const locationIndex = locations.value.findIndex(loc => loc.id === locationId);
+        if (locationIndex !== -1) {
+            locations.value[locationIndex].latitude = latitude;
+            locations.value[locationIndex].longitude = longitude;
+        }
+
+        recalculateDistances();
+        moveFeedback.value = `${locations.value[locationIndex].name} moved!`;
+        setTimeout(() => { moveFeedback.value = ''; }, 2000);
+        return true;
+    } catch (error) {
+        console.error('Error updating location position:', error);
+        if (error.response?.status === 401) {
+            alert('Session expired. Please log in again.');
+            router.visit('/login');
+        } else {
+            alert('Failed to update location position: ' + (error.response?.data?.error || error.message || 'Unknown error'));
+        }
+        return false;
+    }
+};
+
+// Save temporary locations
+const saveTempLocations = async (profileId) => {
+    try {
+        for (const tempLocation of tempLocations.value) {
+            const response = await axios.post('/api/locations', {
+                name: tempLocation.name,
+                latitude: tempLocation.latitude,
+                longitude: tempLocation.longitude,
+                service_profile_id: profileId,
+            });
+            const newLocation = response.data;
+            locations.value.push(newLocation);
+
+            const tempIndex = tempLocations.value.indexOf(tempLocation);
+            const tempMarker = tempMarkers.value[tempIndex];
+            tempMarker.remove();
+
+            const markerElement = createCustomMarkerElement(tempLocation.name, markerColors[tempLocation.name]);
+            const marker = new mapboxgl.Marker({ element: markerElement, draggable: true })
+                .setLngLat([tempLocation.longitude, tempLocation.latitude])
+                .addTo(mapInstance.value);
+
+            marker.on('dragend', async () => {
+                const { lng, lat } = marker.getLngLat();
+                await updateLocationPosition(newLocation.id, lat, lng);
+            });
+
+            markers.value.push(marker);
+        }
+
+        tempLocations.value = [];
+        tempMarkers.value = [];
+    } catch (error) {
+        console.error('Error saving temporary locations:', error);
+        alert('Failed to save temporary locations: ' + (error.response?.data?.error || error.message || 'Unknown error'));
+    }
+};
+
+// Load profiles for the selected round
+const loadProfilesForRound = () => {
+    filteredProfiles.value = props.serviceProfiles.filter(profile => profile.round_id === activeRound.value);
+    if (filteredProfiles.value.length > 0) {
+        editProfile(filteredProfiles.value[0].id);
     } else {
-      document.removeEventListener('click', closeDropdown);
+        form.id = null;
+        form.round_id = activeRound.value;
+        form.fuel_cost_per_unit = 0;
+        form.distance_unit = 'mile';
+        form.distance_home_to_work = 0;
+        form.distance_work_to_start = 0;
+        form.distance_end_to_home = 0;
+        form.loading_time_cost_per_hour = 0;
+        form.loading_time_hours = 0;
+        locations.value = [];
+        markers.value.forEach(marker => marker.remove());
+        markers.value = [];
+        tempLocations.value = [];
+        tempMarkers.value.forEach(marker => marker.remove());
+        tempMarkers.value = [];
+        selectedWorkLocation.value = null;
     }
-  });
+};
 
-  const toggleDropdown = () => {
-    isDropdownOpen.value = !isDropdownOpen.value;
-  };
-
-  const toggleRoundSummaries = () => {
-    areRoundSummariesExpanded.value = !areRoundSummariesExpanded.value;
-  };
-
-  // Initial load
-  onMounted(() => {
-    updateChartData();
-    if (props.selectedPeriods.length) {
-      fetchReport();
+// Edit a service profile
+const editProfile = async (profileId) => {
+    try {
+        const response = await router.get(`/service-profile/${profileId}/edit`);
+    } catch (error) {
+        console.error('Error loading profile for editing:', error);
+        alert('Failed to load profile for editing: ' + (error.message || 'Unknown error'));
     }
-  });
-  </script>
+};
 
-  <style scoped>
-  table tbody tr { transition: background-color 0.2s ease; }
-  .bg-gray-800:hover { transform: translateY(-2px); }
-  table { border-collapse: separate; border-spacing: 0; width: 100%; }
-  th, td { border-bottom: 1px solid #4B5563; }
-  th:first-child, td:first-child { border-left: none; }
-  th:last-child, td:last-child { border-right: none; }
-  .rounded-tl-lg { border-top-left-radius: 0.5rem; }
-  .rounded-tr-lg { border-top-right-radius: 0.5rem; }
-  .max-h-60 { max-height: 15rem; }
-  </style>
+// Initialize Mapbox
+onMounted(async () => {
+    if (props.error) {
+        console.warn('Skipping Mapbox initialization due to error:', props.error);
+        return;
+    }
+
+    if (!props.mapboxAccessToken) {
+        console.error('Mapbox access token is missing');
+        alert('Map configuration error: Mapbox access token is missing. Please contact support.');
+        return;
+    }
+
+    await fetchCsrfToken();
+    await fetchWorkLocations();
+
+    if (activeRound.value) {
+        loadProfilesForRound();
+    }
+
+    mapInstance.value = new mapboxgl.Map({
+        container: map.value,
+        style: 'mapbox://styles/mapbox/dark-v10',
+        center: [-0.1278, 51.5074],
+        zoom: 9,
+    });
+
+    const bounds = new mapboxgl.LngLatBounds();
+    locations.value.forEach((loc) => {
+        const markerElement = createCustomMarkerElement(loc.name, markerColors[loc.name]);
+        const marker = new mapboxgl.Marker({ element: markerElement, draggable: true })
+            .setLngLat([loc.longitude, loc.latitude])
+            .addTo(mapInstance.value);
+
+        bounds.extend([loc.longitude, loc.latitude]);
+
+        marker.on('dragend', async () => {
+            const { lng, lat } = marker.getLngLat();
+            await updateLocationPosition(loc.id, lat, lng);
+        });
+
+        markers.value.push(marker);
+    });
+
+    if (locations.value.length > 0) {
+        mapInstance.value.fitBounds(bounds, {
+            padding: 50,
+            maxZoom: 15,
+        });
+    }
+
+    mapInstance.value.on('click', async (e) => {
+        const nonWorkLocations = (form.id ? locations.value : tempLocations.value).filter(loc => loc.name !== 'Work');
+        if (nonWorkLocations.length >= 3) {
+            alert('Only three locations (Home, Start, End) can be set. Work location is set via the dropdown. Clear pins to add new ones.');
+            return;
+        }
+
+        const { lng, lat } = e.lngLat;
+        const name = locationNames[nonWorkLocations.length];
+
+        if (form.id) {
+            try {
+                if (!(await fetchCsrfToken())) {
+                    alert('Failed to initialize request. Please refresh the page.');
+                    return;
+                }
+
+                const response = await axios.post('/api/locations', {
+                    name,
+                    latitude: lat,
+                    longitude: lng,
+                    service_profile_id: form.id,
+                });
+                const newLocation = response.data;
+                locations.value.push(newLocation);
+
+                const markerElement = createCustomMarkerElement(name, markerColors[name]);
+                const marker = new mapboxgl.Marker({ element: markerElement, draggable: true })
+                    .setLngLat([lng, lat])
+                    .addTo(mapInstance.value);
+
+                marker.on('dragend', async () => {
+                    const { lng, lat } = marker.getLngLat();
+                    await updateLocationPosition(newLocation.id, lat, lng);
+                });
+
+                markers.value.push(marker);
+                recalculateDistances();
+            } catch (error) {
+                console.error('Error saving location:', error);
+                if (error.response?.status === 401) {
+                    alert('Session expired. Please log in again.');
+                    router.visit('/login');
+                } else if (error.response?.status === 404) {
+                    alert('Service profile not found. Please save your profile first.');
+                } else if (error.response?.status === 422) {
+                    alert('No rounds available. Please create a round first.');
+                } else if (error.response?.status === 500) {
+                    alert('Failed to save location: ' + (error.response?.data?.error || 'Server error. Please ensure a round is created and try again, or contact support.'));
+                } else {
+                    alert('Failed to save location: ' + (error.response?.data?.error || error.message || 'Unknown error'));
+                }
+            }
+        } else {
+            const tempLocation = {
+                name,
+                latitude: lat,
+                longitude: lng,
+            };
+            tempLocations.value.push(tempLocation);
+
+            const markerElement = createCustomMarkerElement(name, markerColors[name]);
+            const marker = new mapboxgl.Marker({ element: markerElement, draggable: true })
+                .setLngLat([lng, lat])
+                .addTo(mapInstance.value);
+
+            marker.on('dragend', () => {
+                const { lng, lat } = marker.getLngLat();
+                const tempIndex = tempLocations.value.findIndex(loc => loc.name === name);
+                if (tempIndex !== -1) {
+                    tempLocations.value[tempIndex].latitude = lat;
+                    tempLocations.value[tempIndex].longitude = lng;
+                }
+                recalculateDistances();
+            });
+
+            tempMarkers.value.push(marker);
+            recalculateDistances();
+        }
+    });
+});
+
+onUnmounted(() => {
+    if (mapInstance.value) mapInstance.value.remove();
+});
+
+const clearPins = async () => {
+    if (locations.value.length === 0 && tempLocations.value.length === 0) {
+        clearFeedback.value = 'No pins to clear';
+        setTimeout(() => { clearFeedback.value = ''; }, 2000);
+        return;
+    }
+
+    try {
+        isClearing.value = true;
+        clearFeedback.value = '';
+
+        if (form.id) {
+            if (!(await fetchCsrfToken())) {
+                alert('Failed to initialize request. Please refresh the page.');
+                return;
+            }
+
+            const deletePromises = locations.value.map(async (loc) => {
+                try {
+                    await axios.delete(`/api/locations/${loc.id}`, {
+                        params: { service_profile_id: form.id },
+                    });
+                    return { id: loc.id, success: true };
+                } catch (error) {
+                    console.error(`Failed to delete location ${loc.id}:`, error);
+                    return { id: loc.id, success: false, error: error.message };
+                }
+            });
+
+            const results = await Promise.all(deletePromises);
+            const failedDeletions = results.filter(result => !result.success);
+            if (failedDeletions.length > 0) {
+                const errorMessages = failedDeletions.map(result => `Location ${result.id}: ${result.error}`).join('; ');
+                throw new Error(`Some locations could not be deleted: ${errorMessages}`);
+            }
+
+            markers.value.forEach(marker => marker.remove());
+            markers.value = [];
+            locations.value = [];
+        }
+
+        tempMarkers.value.forEach(marker => marker.remove());
+        tempMarkers.value = [];
+        tempLocations.value = [];
+
+        form.distance_home_to_work = 0;
+        form.distance_work_to_start = 0;
+        form.distance_end_to_home = 0;
+        selectedWorkLocation.value = null;
+
+        clearFeedback.value = 'Pins cleared!';
+        setTimeout(() => { clearFeedback.value = ''; }, 2000);
+    } catch (error) {
+        console.error('Error clearing pins:', error);
+        if (error.response?.status === 401) {
+            alert('Session expired. Please log in again.');
+            router.visit('/login');
+        } else {
+            alert('Failed to clear pins: ' + (error.message || 'Unknown error'));
+        }
+    } finally {
+        isClearing.value = false;
+    }
+};
+
+const submitForm = () => {
+    // Validate form inputs
+    let hasErrors = false;
+    Object.keys(formErrors).forEach(key => {
+        validateInput(key);
+        if (formErrors[key]) hasErrors = true;
+    });
+
+    if (hasErrors) {
+        alert('Please correct the form errors before submitting.');
+        return;
+    }
+
+    const route = props.isEditing ? 'service-profile.update' : 'service-profile.store';
+    const method = props.isEditing ? 'put' : 'post';
+    const url = props.isEditing ? `/service-profile/${form.id}` : '/service-profile';
+
+    router[method](url, {
+        ...form,
+        total_fuel_cost: totalFuelCost.value,
+        total_loading_cost: loadingTimeCost.value,
+        total_cost: totalCost.value,
+    }, {
+        onSuccess: (page) => {
+            if (!props.isEditing) {
+                const newProfileId = page.props.profile?.id || page.props.serviceProfiles?.find(p => p.round_id === form.round_id)?.id;
+                if (newProfileId) {
+                    form.id = newProfileId;
+                    saveTempLocations(newProfileId);
+                }
+            }
+            activeRound.value = form.round_id;
+            loadProfilesForRound();
+        },
+        onError: (errors) => {
+            console.error('Form submission errors:', errors);
+            alert('Failed to save profile: ' + Object.values(errors).join(', '));
+        },
+    });
+};
+
+const deleteProfile = () => {
+    if (confirm('Are you sure you want to delete this profile?')) {
+        router.delete(`/service-profile/${form.id}`, {
+            onSuccess: () => {
+                activeRound.value = form.round_id;
+                loadProfilesForRound();
+            },
+            onError: (errors) => {
+                console.error('Deletion errors:', errors);
+                alert('Failed to delete profile: ' + Object.values(errors).join(', '));
+            },
+        });
+    }
+};
+</script>
+
+<style scoped>
+.map-container {
+    position: relative;
+    width: 100%;
+    height: 400px;
+}
+
+.custom-marker {
+    transform: translate(-50%, -50%);
+    cursor: move;
+}
+</style>
