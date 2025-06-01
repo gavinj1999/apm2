@@ -1,32 +1,24 @@
 <!-- resources/js/Pages/ServiceProfile/Index.vue -->
 <template>
-    <AppLayout  :breadcrumbs="Reports">
+    <AppLayout :breadcrumbs="Reports">
         <div class="p-6 bg-gray-900 text-gray-100 min-h-screen">
-            <!-- Page Title -->
             <h1 class="text-3xl font-bold mb-8 tracking-tight">Service Profiles</h1>
 
             <!-- Flash Messages -->
-            <div v-if="$page.props.flash.success"
-                class="bg-green-600 text-white p-4 mb-6 rounded-lg shadow-lg transition-all duration-300">
+            <div v-if="$page.props.flash.success" class="bg-green-600 text-white p-4 mb-6 rounded-lg shadow-lg transition-all duration-300">
                 {{ $page.props.flash.success }}
             </div>
-            <div v-if="$page.props.flash.error"
-                class="bg-red-600 text-white p-4 mb-6 rounded-lg shadow-lg transition-all duration-300">
+            <div v-if="$page.props.flash.error" class="bg-red-600 text-white p-4 mb-6 rounded-lg shadow-lg transition-all duration-300">
                 {{ $page.props.flash.error }}
             </div>
-
-            <!-- Error Message for Missing Mapbox Token -->
-            <div v-if="$page.props.error"
-                class="bg-red-600 text-white p-4 mb-6 rounded-lg shadow-lg transition-all duration-300">
+            <div v-if="$page.props.error" class="bg-red-600 text-white p-4 mb-6 rounded-lg shadow-lg transition-all duration-300">
                 {{ $page.props.error }}
             </div>
 
             <!-- Round Selection -->
             <div class="mb-6">
                 <label for="active_round" class="block mb-2 font-medium text-gray-300">Select Active Round</label>
-                <select v-model="activeRound" id="active_round"
-                    class="w-full max-w-xs p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                    @change="loadProfilesForRound">
+                <select v-model="activeRound" id="active_round" class="w-full max-w-xs p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" @change="loadProfilesForRound">
                     <option v-for="(name, id) in rounds" :key="id" :value="id">{{ name }}</option>
                 </select>
             </div>
@@ -36,11 +28,9 @@
                 <h2 class="text-2xl font-semibold mb-4">Service Profiles for Selected Round</h2>
                 <div class="bg-gray-800 rounded-lg shadow-md p-4">
                     <ul class="space-y-2">
-                        <li v-for="profile in filteredProfiles" :key="profile.id"
-                            class="flex justify-between items-center p-2 bg-gray-700 rounded-lg">
-                            <span>Profile #{{ profile.id }} (Fuel Cost: £{{ profile.fuel_cost_per_unit }})</span>
-                            <button @click="editProfile(profile.id)"
-                                class="px-4 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 transition-all duration-200">
+                        <li v-for="profile in filteredProfiles" :key="profile.id" class="flex justify-between items-center p-2 bg-gray-700 rounded-lg">
+                            <span>Profile #{{ profile.id }} (Fuel Cost: £{{ profile.fuel_cost_per_unit }} | Total Cost: £{{ calculateTotalCost(profile).toFixed(2) }})</span>
+                            <button @click="editProfile(profile.id)" class="px-4 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 transition-all duration-200">
                                 Edit
                             </button>
                         </li>
@@ -51,166 +41,142 @@
                 No service profiles found for this round. Create a new one below.
             </div>
 
-            <!-- Service Profile Form -->
-            <div v-if="!$page.props.error" class="bg-gray-800 rounded-lg shadow-md p-4">
-                <form @submit.prevent="submitForm">
-                    <!-- Form Inputs in 2x4 Grid -->
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <!-- Row 1 -->
-                        <div class="mb-4">
-                            <label for="round_id"
-                                class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Associated
-                                Round</label>
-                            <select v-model="form.round_id" id="round_id"
-                                class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                                required :disabled="isEditing">
-                                <option v-for="(name, id) in rounds" :key="id" :value="id">{{ name }}</option>
-                            </select>
-                        </div>
-
-                        <div class="mb-4">
-                            <label for="fuel_cost_per_unit"
-                                class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Fuel
-                                Cost Per Unit (£)</label>
-                            <input type="number" step="0.01" v-model="form.fuel_cost_per_unit" id="fuel_cost_per_unit"
-                                class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                                required />
-                        </div>
-
-                        <div class="mb-4">
-                            <label for="distance_unit"
-                                class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Distance
-                                Unit</label>
-                            <select v-model="form.distance_unit" id="distance_unit"
-                                class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
-                                <option value="mile">Mile</option>
-                                <option value="km">Kilometer</option>
-                            </select>
-                        </div>
-
-                        <div class="mb-4">
-                            <label for="distance_home_to_work"
-                                class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Distance
-                                Home to Work (miles)</label>
-                            <input type="number" step="0.01" v-model="form.distance_home_to_work"
-                                id="distance_home_to_work"
-                                class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                                required />
-                        </div>
-
-                        <!-- Row 2 -->
-                        <div class="mb-4">
-                            <label for="distance_work_to_start"
-                                class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Distance
-                                Work to Start Location (miles)</label>
-                            <input type="number" step="0.01" v-model="form.distance_work_to_start"
-                                id="distance_work_to_start"
-                                class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                                required />
-                        </div>
-
-                        <div class="mb-4">
-                            <label for="distance_end_to_home"
-                                class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Distance
-                                End Location to Home (miles)</label>
-                            <input type="number" step="0.01" v-model="form.distance_end_to_home"
-                                id="distance_end_to_home"
-                                class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                                required />
-                        </div>
-
-                        <div class="mb-4">
-                            <label for="loading_time_cost_per_hour"
-                                class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Loading
-                                Time Cost Per Hour (£)</label>
-                            <input type="number" step="0.01" v-model="form.loading_time_cost_per_hour"
-                                id="loading_time_cost_per_hour"
-                                class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                                required />
-                        </div>
-
-                        <div class="mb-4">
-                            <label for="loading_time_hours"
-                                class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Loading
-                                Time (Hours)</label>
-                            <input type="number" step="0.01" v-model="form.loading_time_hours" id="loading_time_hours"
-                                class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                                required />
-                        </div>
+            <!-- Cost Summary -->
+            <div v-if="form.id || tempLocations.length" class="mb-6 bg-gray-800 rounded-lg shadow-md p-4">
+                <h2 class="text-xl font-semibold mb-4">Cost Summary</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <p class="font-medium text-gray-300">Total Fuel Cost:</p>
+                        <p class="text-lg">£{{ totalFuelCost.toFixed(2) }}</p>
                     </div>
-
-                    <!-- Work Location Selection -->
-                    <div class="mb-4">
-                        <label for="work_location" class="block mb-2 font-medium text-gray-300">Select Work Location
-                            (Depot)</label>
-                        <select v-model="selectedWorkLocation" id="work_location"
-                            class="w-full max-w-md p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                            @change="setWorkLocation">
-                            <option value="">Select a Work Location</option>
-                            <option v-for="location in workLocations" :key="location.id" :value="location.id">
-                                {{ location.name }} ({{ location.address }})
-                            </option>
-                        </select>
+                    <div>
+                        <p class="font-medium text-gray-300">Loading Time Cost:</p>
+                        <p class="text-lg">£{{ loadingTimeCost.toFixed(2) }}</p>
                     </div>
+                    <div>
+                        <p class="font-medium text-gray-300">Total Cost:</p>
+                        <p class="text-lg">£{{ totalCost.toFixed(2) }}</p>
+                    </div>
+                </div>
+                <!-- Cost Chart -->
+                <div class="mt-4">
+                    <h3 class="text-lg font-medium text-gray-300 mb-2">Cost Breakdown</h3>
+                    <div class="w-full h-64">
+                        <canvas ref="costChart"></canvas>
+                    </div>
+                </div>
+            </div>
 
-                    <!-- Map Section -->
-                    <div class="mb-4">
-                        <label class="block mb-2 font-medium text-gray-300">Set Locations on Map</label>
-                        <div v-if="isRecalculating"
-                            class="bg-yellow-600 text-white p-2 rounded-lg mb-2 text-center transition-opacity duration-300">
-                            Recalculating Distances...
-                        </div>
-                        <div ref="map" class="w-full h-96 bg-gray-700 rounded-lg"></div>
-                        <p class="mt-2 text-sm text-gray-400">
-                            Click the map to set Home, Start, and End locations in that order. Work location is set via
-                            the dropdown above.
-                            <span v-if="!form.id" class="text-yellow-400">Note: Locations will be saved after you save
-                                the profile.</span>
-                        </p>
-                        <div class="mt-2">
-                            <button type="button" @click="clearPins"
-                                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500 transition-all duration-200"
-                                :disabled="isClearing">
-                                {{ isClearing ? 'Clearing...' : clearFeedback || 'Clear Pins' }}
-                            </button>
-                            <div v-if="moveFeedback"
-                                class="mt-2 w-full bg-green-600 text-white p-2 rounded-lg text-center text-lg font-semibold transition-opacity duration-300">
-                                {{ moveFeedback }}
+            <!-- Service Profile Form and Map -->
+            <div v-if="!$page.props.error" class="bg-gray-800 rounded-lg shadow-md p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Form Section -->
+                <div>
+                    <form @submit.prevent="submitForm">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="mb-4">
+                                <label for="round_id" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Associated Round</label>
+                                <select v-model="form.round_id" id="round_id" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required :disabled="isEditing">
+                                    <option v-for="(name, id) in rounds" :key="id" :value="id">{{ name }}</option>
+                                </select>
+                            </div>
+                            <div class="mb-4">
+                                <label for="fuel_cost_per_unit" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Fuel Cost Per Unit (£)</label>
+                                <input type="number" step="0.01" v-model="form.fuel_cost_per_unit" id="fuel_cost_per_unit" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required min="0" @input="validateInput('fuel_cost_per_unit')" />
+                                <p v-if="formErrors.fuel_cost_per_unit" class="text-red-400 text-sm mt-1">{{ formErrors.fuel_cost_per_unit }}</p>
+                            </div>
+                            <div class="mb-4">
+                                <label for="distance_unit" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Distance Unit</label>
+                                <select v-model="form.distance_unit" id="distance_unit" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
+                                    <option value="mile">Mile</option>
+                                    <option value="km">Kilometer</option>
+                                </select>
+                            </div>
+                            <div class="mb-4">
+                                <label for="distance_home_to_work" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Distance Home to Work</label>
+                                <input type="number" step="0.01" v-model="form.distance_home_to_work" id="distance_home_to_work" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required readonly />
+                            </div>
+                            <div class="mb-4">
+                                <label for="distance_work_to_start" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Distance Work to Start</label>
+                                <input type="number" step="0.01" v-model="form.distance_work_to_start" id="distance_work_to_start" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required readonly />
+                            </div>
+                            <div class="mb-4">
+                                <label for="distance_end_to_home" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Distance End to Home</label>
+                                <input type="number" step="0.01" v-model="form.distance_end_to_home" id="distance_end_to_home" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required readonly />
+                            </div>
+                            <div class="mb-4">
+                                <label for="loading_time_cost_per_hour" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Loading Time Cost Per Hour (£)</label>
+                                <input type="number" step="0.01" v-model="form.loading_time_cost_per_hour" id="loading_time_cost_per_hour" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required min="0" @input="validateInput('loading_time_cost_per_hour')" />
+                                <p v-if="formErrors.loading_time_cost_per_hour" class="text-red-400 text-sm mt-1">{{ formErrors.loading_time_cost_per_hour }}</p>
+                            </div>
+                            <div class="mb-4">
+                                <label for="loading_time_hours" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Loading Time (Hours)</label>
+                                <input type="number" step="0.01" v-model="form.loading_time_hours" id="loading_time_hours" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required min="0" @input="validateInput('loading_time_hours')" />
+                                <p v-if="formErrors.loading_time_hours" class="text-red-400 text-sm mt-1">{{ formErrors.loading_time_hours }}</p>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Form Actions -->
-                    <div class="flex justify-between">
-                        <div v-if="isEditing">
-                            <button type="submit"
-                                class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200">
-                                Update Profile
-                            </button>
-                            <button type="button" @click="deleteProfile"
-                                class="ml-4 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200">
-                                Delete Profile
-                            </button>
+                        <!-- Work Location Selection -->
+                        <div class="mb-4">
+                            <label for="work_location" class="block mb-2 font-medium text-gray-300">Select Work Location (Depot)</label>
+                            <select v-model="selectedWorkLocation" id="work_location" class="w-full max-w-md p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" @change="setWorkLocation">
+                                <option value="">Select a Work Location</option>
+                                <option v-for="location in workLocations" :key="location.id" :value="location.id">
+                                    {{ location.name }} ({{ location.address }})
+                                </option>
+                            </select>
                         </div>
-                        <div v-else>
-                            <button type="submit"
-                                class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200">
-                                Save Profile
-                            </button>
+
+                        <!-- Form Actions -->
+                        <div class="flex justify-between">
+                            <div v-if="isEditing">
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200">
+                                    Update Profile
+                                </button>
+                                <button type="button" @click="deleteProfile" class="ml-4 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200">
+                                    Delete Profile
+                                </button>
+                            </div>
+                            <div v-else>
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200">
+                                    Save Profile
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Map Section -->
+                <div>
+                    <label class="block mb-2 font-medium text-gray-300">Set Locations on Map</label>
+                    <div v-if="isRecalculating" class="bg-yellow-600 text-white p-2 rounded-lg mb-2 text-center transition-opacity duration-300">
+                        Recalculating Distances...
+                    </div>
+                    <div ref="map" class="w-full h-[600px] bg-gray-700 rounded-lg"></div>
+                    <p class="mt-2 text-sm text-gray-400">
+                        Click the map to set Home, Start, and End locations in that order. Work location is set via the dropdown above.
+                        <span v-if="!form.id" class="text-yellow-400">Note: Locations will be saved after you save the profile.</span>
+                    </p>
+                    <div class="mt-2">
+                        <button type="button" @click="clearPins" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500 transition-all duration-200" :disabled="isClearing">
+                            {{ isClearing ? 'Clearing...' : clearFeedback || 'Clear Pins' }}
+                        </button>
+                        <div v-if="moveFeedback" class="mt-2 w-full bg-green-600 text-white p-2 rounded-lg text-center text-lg font-semibold transition-opacity duration-300">
+                            {{ moveFeedback }}
                         </div>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
     </AppLayout>
 </template>
 
 <script setup>
-import { reactive, ref, onMounted, onUnmounted } from 'vue';
+import { reactive, ref, computed, onMounted, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import mapboxgl from 'mapbox-gl';
 import AppLayout from '@/layouts/AppLayout.vue';
 import axios from 'axios';
+import Chart from 'chart.js/auto';
 
 const props = defineProps({
     serviceProfiles: Array,
@@ -226,13 +192,7 @@ const props = defineProps({
     error: String,
 });
 
-// Log props to debug
-console.log('Props received in ServiceProfile/Index.vue:', {
-    mapboxAccessToken: props.mapboxAccessToken,
-    error: props.error,
-    allProps: props,
-});
-
+// Form state
 const form = reactive({
     id: props.profile?.id || null,
     round_id: props.profile?.round_id || Object.keys(props.rounds)[0] || null,
@@ -245,39 +205,85 @@ const form = reactive({
     loading_time_hours: props.profile?.loading_time_hours || 0,
 });
 
+// Form errors for validation
+const formErrors = reactive({
+    fuel_cost_per_unit: '',
+    loading_time_cost_per_hour: '',
+    loading_time_hours: '',
+});
+
+// Map and location state
 const map = ref(null);
 const mapInstance = ref(null);
+const costChart = ref(null);
 const locations = ref(props.initialLocations || []);
-const tempLocations = ref([]); // Temporary storage for locations before profile is saved
-const tempMarkers = ref([]); // Temporary storage for markers before profile is saved
-const markers = ref([]); // Store map markers for removal
-const isClearing = ref(false); // Track clearing state
-const clearFeedback = ref(''); // Display feedback after clearing
-const moveFeedback = ref(''); // Display feedback after moving a pin
-const isRecalculating = ref(false); // Track recalculation state
-const activeRound = ref(Object.keys(props.rounds)[0] || null); // Default to first round
-const filteredProfiles = ref([]); // Filtered profiles for the active round
-const workLocations = ref([]); // List of work locations
-const selectedWorkLocation = ref(null); // Selected work location ID
+const tempLocations = ref([]);
+const tempMarkers = ref([]);
+const markers = ref([]);
+const isClearing = ref(false);
+const clearFeedback = ref('');
+const moveFeedback = ref('');
+const isRecalculating = ref(false);
+const activeRound = ref(Object.keys(props.rounds)[0] || null);
+const filteredProfiles = ref([]);
+const workLocations = ref([]);
+const selectedWorkLocation = ref(null);
 
-// Set Mapbox access token from props
 mapboxgl.accessToken = props.mapboxAccessToken;
 
-// Marker colors for each location
 const markerColors = {
-    Home: '#22C55E', // Green
-    Work: '#3B82F6', // Blue
-    'Start Location': '#F59E0B', // Orange
-    'End Location': '#EF4444', // Red
+    Home: '#22C55E',
+    Work: '#3B82F6',
+    'Start Location': '#F59E0B',
+    'End Location': '#EF4444',
 };
 
-// Location names in order (excluding Work since it's set via dropdown)
 const locationNames = ['Home', 'Start Location', 'End Location'];
 
-// Haversine formula for distance calculation (in miles)
+// Cost calculations
+const totalFuelCost = computed(() => {
+    const totalDistance = 
+        Number(form.distance_home_to_work || 0) +
+        Number(form.distance_work_to_start || 0) +
+        Number(form.distance_end_to_home || 0);
+    return (totalDistance * Number(form.fuel_cost_per_unit || 0)).toFixed(2);
+});
+
+const loadingTimeCost = computed(() => {
+    return (Number(form.loading_time_hours || 0) * Number(form.loading_time_cost_per_hour || 0)).toFixed(2);
+});
+
+const totalCost = computed(() => {
+    return (Number(totalFuelCost.value) + Number(loadingTimeCost.value)).toFixed(2);
+});
+
+// Calculate total cost for a profile (used in profile list)
+const calculateTotalCost = (profile) => {
+    const totalDistance = 
+        Number(profile.distance_home_to_work || 0) +
+        Number(profile.distance_work_to_start || 0) +
+        Number(profile.distance_end_to_home || 0);
+    const fuelCost = totalDistance * Number(profile.fuel_cost_per_unit || 0);
+    const loadingCost = Number(profile.loading_time_hours || 0) * Number(profile.loading_time_cost_per_hour || 0);
+    return fuelCost + loadingCost;
+};
+
+// Input validation
+const validateInput = (field) => {
+    formErrors[field] = '';
+    if (form[field] < 0) {
+        formErrors[field] = `${field.replace(/_/g, ' ')} cannot be negative`;
+        form[field] = 0;
+    } else if (form[field] > 1000) {
+        formErrors[field] = `${field.replace(/_/g, ' ')} is too large`;
+        form[field] = 1000;
+    }
+};
+
+// Haversine formula
 const haversineDistance = (coord1, coord2) => {
     const toRadians = (degrees) => (degrees * Math.PI) / 180;
-    const R = 3958.8; // Earth's radius in miles
+    const R = form.distance_unit === 'mile' ? 3958.8 : 6371; // Earth's radius in miles or km
     const dLat = toRadians(coord2.latitude - coord1.latitude);
     const dLng = toRadians(coord2.longitude - coord1.longitude);
     const a =
@@ -285,14 +291,13 @@ const haversineDistance = (coord1, coord2) => {
         Math.cos(toRadians(coord1.latitude)) * Math.cos(toRadians(coord2.latitude)) *
         Math.sin(dLng / 2) * Math.sin(dLng / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in miles
+    return R * c;
 };
 
 // Fetch CSRF token
 const fetchCsrfToken = async () => {
     try {
         await axios.get('/sanctum/csrf-cookie');
-        console.log('CSRF token fetched for API request');
         return true;
     } catch (error) {
         console.error('Error fetching CSRF token:', error);
@@ -311,7 +316,7 @@ const fetchWorkLocations = async () => {
     }
 };
 
-// Create a custom marker element with the location name
+// Create custom marker
 const createCustomMarkerElement = (name, color) => {
     const el = document.createElement('div');
     el.className = 'custom-marker';
@@ -327,7 +332,7 @@ const createCustomMarkerElement = (name, color) => {
     return el;
 };
 
-// Recalculate distances based on current pin positions
+// Recalculate distances
 const recalculateDistances = () => {
     isRecalculating.value = true;
     const home = locations.value.find((loc) => loc.name === 'Home') || tempLocations.value.find((loc) => loc.name === 'Home');
@@ -335,33 +340,25 @@ const recalculateDistances = () => {
     const start = locations.value.find((loc) => loc.name === 'Start Location') || tempLocations.value.find((loc) => loc.name === 'Start Location');
     const end = locations.value.find((loc) => loc.name === 'End Location') || tempLocations.value.find((loc) => loc.name === 'End Location');
 
-    // Calculate distance_home_to_work
     form.distance_home_to_work = (home && work) ? haversineDistance(home, work).toFixed(2) : 0;
-
-    // Calculate distance_work_to_start
     form.distance_work_to_start = (work && start) ? haversineDistance(work, start).toFixed(2) : 0;
-
-    // Calculate distance_end_to_home
     form.distance_end_to_home = (end && home) ? haversineDistance(end, home).toFixed(2) : 0;
 
-    setTimeout(() => { isRecalculating.value = false; }, 500); // Simulate a short delay for visibility
+    setTimeout(() => { isRecalculating.value = false; }, 500);
 };
 
-// Set Work location based on dropdown selection
+// Set work location
 const setWorkLocation = async () => {
     if (!selectedWorkLocation.value) return;
-
     const workLocation = workLocations.value.find(loc => loc.id === selectedWorkLocation.value);
     if (!workLocation) return;
 
     try {
-        // Ensure CSRF token is fresh
         if (!(await fetchCsrfToken())) {
             alert('Failed to initialize request. Please refresh the page.');
             return;
         }
 
-        // Remove existing Work pin if it exists
         const existingWork = locations.value.find(loc => loc.name === 'Work');
         if (existingWork) {
             await axios.delete(`/api/locations/${existingWork.id}`, {
@@ -383,7 +380,6 @@ const setWorkLocation = async () => {
         }
 
         if (form.id) {
-            // Add new Work pin to backend if profile exists
             const response = await axios.post('/api/locations', {
                 name: 'Work',
                 latitude: workLocation.latitude,
@@ -391,7 +387,6 @@ const setWorkLocation = async () => {
                 service_profile_id: form.id,
             });
             const newLocation = response.data;
-
             locations.value.push(newLocation);
 
             const markerElement = createCustomMarkerElement('Work', markerColors['Work']);
@@ -405,8 +400,10 @@ const setWorkLocation = async () => {
             });
 
             markers.value.push(marker);
+
+            // Center map on new Work location
+            mapInstance.value.setCenter([workLocation.longitude, workLocation.latitude]);
         } else {
-            // Add to temporary storage if profile doesn't exist yet
             const tempLocation = {
                 name: 'Work',
                 latitude: workLocation.latitude,
@@ -430,6 +427,9 @@ const setWorkLocation = async () => {
             });
 
             tempMarkers.value.push(marker);
+
+            // Center map on temporary Work location
+            mapInstance.value.setCenter([workLocation.longitude, workLocation.latitude]);
         }
 
         recalculateDistances();
@@ -439,10 +439,9 @@ const setWorkLocation = async () => {
     }
 };
 
-// Update location position in the backend
+// Update location position
 const updateLocationPosition = async (locationId, latitude, longitude) => {
     try {
-        // Ensure CSRF token is fresh
         if (!(await fetchCsrfToken())) {
             alert('Failed to initialize request. Please refresh the page.');
             return false;
@@ -455,16 +454,13 @@ const updateLocationPosition = async (locationId, latitude, longitude) => {
             params: { service_profile_id: form.id },
         });
 
-        // Update the local locations array
         const locationIndex = locations.value.findIndex(loc => loc.id === locationId);
         if (locationIndex !== -1) {
             locations.value[locationIndex].latitude = latitude;
             locations.value[locationIndex].longitude = longitude;
         }
 
-        // Recalculate distances after every move
         recalculateDistances();
-
         moveFeedback.value = `${locations.value[locationIndex].name} moved!`;
         setTimeout(() => { moveFeedback.value = ''; }, 2000);
         return true;
@@ -480,7 +476,7 @@ const updateLocationPosition = async (locationId, latitude, longitude) => {
     }
 };
 
-// Save temporary locations after profile creation
+// Save temporary locations
 const saveTempLocations = async (profileId) => {
     try {
         for (const tempLocation of tempLocations.value) {
@@ -493,7 +489,6 @@ const saveTempLocations = async (profileId) => {
             const newLocation = response.data;
             locations.value.push(newLocation);
 
-            // Replace temporary marker with permanent one
             const tempIndex = tempLocations.value.indexOf(tempLocation);
             const tempMarker = tempMarkers.value[tempIndex];
             tempMarker.remove();
@@ -511,7 +506,6 @@ const saveTempLocations = async (profileId) => {
             markers.value.push(marker);
         }
 
-        // Clear temporary storage
         tempLocations.value = [];
         tempMarkers.value = [];
     } catch (error) {
@@ -557,7 +551,6 @@ const editProfile = async (profileId) => {
 
 // Initialize Mapbox
 onMounted(async () => {
-    // Skip map initialization if there's an error (e.g., missing token)
     if (props.error) {
         console.warn('Skipping Mapbox initialization due to error:', props.error);
         return;
@@ -569,36 +562,28 @@ onMounted(async () => {
         return;
     }
 
-    // Fetch CSRF token on mount
     await fetchCsrfToken();
-
-    // Fetch work locations
     await fetchWorkLocations();
 
-    // Load profiles for the initial active round
     if (activeRound.value) {
         loadProfilesForRound();
     }
 
     mapInstance.value = new mapboxgl.Map({
         container: map.value,
-        style: 'mapbox://styles/mapbox/dark-v10', // Dark theme
-        center: [-0.1278, 51.5074], // Default: London (will be overridden if pins exist)
+        style: 'mapbox://styles/mapbox/dark-v10',
+        center: [-0.1278, 51.5074], // Default: London
         zoom: 9,
     });
 
     // Load existing pins with custom markers
-    const bounds = new mapboxgl.LngLatBounds();
+    const workLocation = locations.value.find(loc => loc.name === 'Work');
     locations.value.forEach((loc) => {
         const markerElement = createCustomMarkerElement(loc.name, markerColors[loc.name]);
         const marker = new mapboxgl.Marker({ element: markerElement, draggable: true })
             .setLngLat([loc.longitude, loc.latitude])
             .addTo(mapInstance.value);
 
-        // Extend bounds to include this pin
-        bounds.extend([loc.longitude, loc.latitude]);
-
-        // Handle drag end to update position
         marker.on('dragend', async () => {
             const { lng, lat } = marker.getLngLat();
             await updateLocationPosition(loc.id, lat, lng);
@@ -607,15 +592,15 @@ onMounted(async () => {
         markers.value.push(marker);
     });
 
-    // Fit map to bounds if there are locations
-    if (locations.value.length > 0) {
-        mapInstance.value.fitBounds(bounds, {
-            padding: 50, // Add padding around the bounds
-            maxZoom: 15, // Limit max zoom to avoid too close a view
-        });
+    // Center map on Work location if it exists, otherwise use default
+    if (workLocation) {
+        mapInstance.value.setCenter([workLocation.longitude, workLocation.latitude]);
+    } else if (locations.value.length > 0) {
+        const bounds = new mapboxgl.LngLatBounds();
+        locations.value.forEach(loc => bounds.extend([loc.longitude, loc.latitude]));
+        mapInstance.value.fitBounds(bounds, { padding: 50, maxZoom: 15 });
     }
 
-    // Handle pin dropping (limit to 3 pins: Home, Start Location, End Location)
     mapInstance.value.on('click', async (e) => {
         const nonWorkLocations = (form.id ? locations.value : tempLocations.value).filter(loc => loc.name !== 'Work');
         if (nonWorkLocations.length >= 3) {
@@ -627,9 +612,7 @@ onMounted(async () => {
         const name = locationNames[nonWorkLocations.length];
 
         if (form.id) {
-            // Save to backend if profile exists
             try {
-                // Ensure CSRF token is fresh
                 if (!(await fetchCsrfToken())) {
                     alert('Failed to initialize request. Please refresh the page.');
                     return;
@@ -642,24 +625,19 @@ onMounted(async () => {
                     service_profile_id: form.id,
                 });
                 const newLocation = response.data;
-
                 locations.value.push(newLocation);
 
-                // Add custom marker with the location name
                 const markerElement = createCustomMarkerElement(name, markerColors[name]);
                 const marker = new mapboxgl.Marker({ element: markerElement, draggable: true })
                     .setLngLat([lng, lat])
                     .addTo(mapInstance.value);
 
-                // Handle drag end to update position
                 marker.on('dragend', async () => {
                     const { lng, lat } = marker.getLngLat();
                     await updateLocationPosition(newLocation.id, lat, lng);
                 });
 
                 markers.value.push(marker);
-
-                // Recalculate distances after adding a new pin
                 recalculateDistances();
             } catch (error) {
                 console.error('Error saving location:', error);
@@ -677,7 +655,6 @@ onMounted(async () => {
                 }
             }
         } else {
-            // Store in temporary array if profile doesn't exist yet
             const tempLocation = {
                 name,
                 latitude: lat,
@@ -701,18 +678,53 @@ onMounted(async () => {
             });
 
             tempMarkers.value.push(marker);
-
             recalculateDistances();
         }
     });
+
+    // Initialize Chart.js for cost breakdown
+    if (costChart.value) {
+        new Chart(costChart.value, {
+            type: 'pie',
+            data: {
+                labels: ['Fuel Cost', 'Loading Time Cost'],
+                datasets: [{
+                    label: 'Cost Breakdown',
+                    data: [totalFuelCost.value, loadingTimeCost.value],
+                    backgroundColor: ['#22C55E', '#3B82F6'],
+                    borderColor: ['#1E3A8A', '#15803D'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { color: '#D1D5DB' }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                label += '£' + context.parsed.toFixed(2);
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
 });
 
-// Cleanup map on unmount
 onUnmounted(() => {
     if (mapInstance.value) mapInstance.value.remove();
 });
 
-// Clear pins with feedback
 const clearPins = async () => {
     if (locations.value.length === 0 && tempLocations.value.length === 0) {
         clearFeedback.value = 'No pins to clear';
@@ -725,13 +737,11 @@ const clearPins = async () => {
         clearFeedback.value = '';
 
         if (form.id) {
-            // Ensure CSRF token is fresh
             if (!(await fetchCsrfToken())) {
                 alert('Failed to initialize request. Please refresh the page.');
                 return;
             }
 
-            // Attempt to delete all locations from backend if profile exists
             const deletePromises = locations.value.map(async (loc) => {
                 try {
                     await axios.delete(`/api/locations/${loc.id}`, {
@@ -745,34 +755,26 @@ const clearPins = async () => {
             });
 
             const results = await Promise.all(deletePromises);
-
-            // Check for any failures
             const failedDeletions = results.filter(result => !result.success);
             if (failedDeletions.length > 0) {
                 const errorMessages = failedDeletions.map(result => `Location ${result.id}: ${result.error}`).join('; ');
                 throw new Error(`Some locations could not be deleted: ${errorMessages}`);
             }
 
-            // Remove all markers from the map
             markers.value.forEach(marker => marker.remove());
             markers.value = [];
-
-            // Clear locations
             locations.value = [];
         }
 
-        // Clear temporary locations and markers
         tempMarkers.value.forEach(marker => marker.remove());
         tempMarkers.value = [];
         tempLocations.value = [];
 
-        // Reset form fields
         form.distance_home_to_work = 0;
         form.distance_work_to_start = 0;
         form.distance_end_to_home = 0;
         selectedWorkLocation.value = null;
 
-        // Show success feedback
         clearFeedback.value = 'Pins cleared!';
         setTimeout(() => { clearFeedback.value = ''; }, 2000);
     } catch (error) {
@@ -788,16 +790,31 @@ const clearPins = async () => {
     }
 };
 
-// Submit form
 const submitForm = () => {
+    // Validate form inputs
+    let hasErrors = false;
+    Object.keys(formErrors).forEach(key => {
+        validateInput(key);
+        if (formErrors[key]) hasErrors = true;
+    });
+
+    if (hasErrors) {
+        alert('Please correct the form errors before submitting.');
+        return;
+    }
+
     const route = props.isEditing ? 'service-profile.update' : 'service-profile.store';
     const method = props.isEditing ? 'put' : 'post';
     const url = props.isEditing ? `/service-profile/${form.id}` : '/service-profile';
 
-    router[method](url, form, {
+    router[method](url, {
+        ...form,
+        total_fuel_cost: totalFuelCost.value,
+        total_loading_cost: loadingTimeCost.value,
+        total_cost: totalCost.value,
+    }, {
         onSuccess: (page) => {
             if (!props.isEditing) {
-                // When creating a new profile, set the form.id and save temporary locations
                 const newProfileId = page.props.profile?.id || page.props.serviceProfiles?.find(p => p.round_id === form.round_id)?.id;
                 if (newProfileId) {
                     form.id = newProfileId;
@@ -814,7 +831,6 @@ const submitForm = () => {
     });
 };
 
-// Delete profile
 const deleteProfile = () => {
     if (confirm('Are you sure you want to delete this profile?')) {
         router.delete(`/service-profile/${form.id}`, {
@@ -832,18 +848,26 @@ const deleteProfile = () => {
 </script>
 
 <style scoped>
-/* Ensure map container is styled correctly */
 .map-container {
     position: relative;
     width: 100%;
-    height: 400px;
+    height: 600px;
 }
 
-/* Optional: Adjust custom marker positioning if needed */
 .custom-marker {
     transform: translate(-50%, -50%);
-    /* Center the marker on the coordinates */
     cursor: move;
-    /* Indicate that the marker is draggable */
+}
+
+/* Ensure grid columns are balanced */
+.grid-cols-2 > div {
+    min-width: 0; /* Prevent overflow */
+}
+
+/* Adjust map height to match form */
+.map-section {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 </style>
