@@ -62,7 +62,14 @@ class ServiceProfileController extends Controller
         ]);
 
         try {
-            $profile = ServiceProfile::create(array_merge($validated, ['user_id' => $user->id]));
+            // Log the data being sent to the database
+            $data = array_merge($validated, ['user_id' => $user->id]);
+            Log::debug('Creating ServiceProfile with data:', $data);
+
+            $profile = ServiceProfile::create($data);
+
+            Log::info('ServiceProfile created successfully:', ['profile_id' => $profile->id, 'user_id' => $user->id]);
+
             return redirect()->route('service-profile')->with('success', 'Profile saved successfully');
         } catch (\Exception $e) {
             Log::error('Failed to create ServiceProfile: ' . $e->getMessage(), [
@@ -131,7 +138,13 @@ class ServiceProfileController extends Controller
         ]);
 
         try {
+            // Log the data being updated
+            Log::debug('Updating ServiceProfile with data:', $validated);
+
             $serviceProfile->update($validated);
+
+            Log::info('ServiceProfile updated successfully:', ['profile_id' => $serviceProfile->id, 'user_id' => $user->id]);
+
             return redirect()->route('service-profile')->with('success', 'Service Profile updated successfully.');
         } catch (\Exception $e) {
             Log::error('Failed to update ServiceProfile: ' . $e->getMessage(), [
@@ -151,6 +164,7 @@ class ServiceProfileController extends Controller
         try {
             $serviceProfile->locations()->delete();
             $serviceProfile->delete();
+            Log::info('ServiceProfile deleted successfully:', ['profile_id' => $id, 'user_id' => $user->id]);
             return redirect()->route('service-profile')->with('success', 'Service Profile deleted successfully.');
         } catch (\Exception $e) {
             Log::error('Failed to delete ServiceProfile: ' . $e->getMessage(), [

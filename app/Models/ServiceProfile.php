@@ -8,6 +8,7 @@ class ServiceProfile extends Model
 {
     protected $fillable = [
 'round_id',
+        'user_id',
         'fuel_cost_per_unit',
         'distance_unit',
         'distance_home_to_work',
