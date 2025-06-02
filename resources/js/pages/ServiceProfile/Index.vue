@@ -47,15 +47,15 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <p class="font-medium text-gray-300">Total Fuel Cost:</p>
-                        <p class="text-lg">£{{ totalFuelCost.toFixed(2) }}</p>
+                        <p class="text-lg">£{{ totalFuelCost }}</p>
                     </div>
                     <div>
                         <p class="font-medium text-gray-300">Loading Time Cost:</p>
-                        <p class="text-lg">£{{ loadingTimeCost.toFixed(2) }}</p>
+                        <p class="text-lg">£{{ loadingTimeCost }}</p>
                     </div>
                     <div>
                         <p class="font-medium text-gray-300">Total Cost:</p>
-                        <p class="text-lg">£{{ totalCost.toFixed(2) }}</p>
+                        <p class="text-lg">£{{ totalCost }}</p>
                     </div>
                 </div>
                 <!-- Cost Chart -->
@@ -81,7 +81,7 @@
                             </div>
                             <div class="mb-4">
                                 <label for="fuel_cost_per_unit" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Fuel Cost Per Unit (£)</label>
-                                <input type="number" step="0.01" v-model="form.fuel_cost_per_unit" id="fuel_cost_per_unit" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required min="0" @input="validateInput('fuel_cost_per_unit')" />
+                                <input type="number" step="0.01" v-model.number="form.fuel_cost_per_unit" id="fuel_cost_per_unit" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required min="0" @input="validateInput('fuel_cost_per_unit')" />
                                 <p v-if="formErrors.fuel_cost_per_unit" class="text-red-400 text-sm mt-1">{{ formErrors.fuel_cost_per_unit }}</p>
                             </div>
                             <div class="mb-4">
@@ -93,24 +93,24 @@
                             </div>
                             <div class="mb-4">
                                 <label for="distance_home_to_work" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Distance Home to Work</label>
-                                <input type="number" step="0.01" v-model="form.distance_home_to_work" id="distance_home_to_work" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required readonly />
+                                <input type="number" step="0.01" v-model.number="form.distance_home_to_work" id="distance_home_to_work" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required readonly />
                             </div>
                             <div class="mb-4">
                                 <label for="distance_work_to_start" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Distance Work to Start</label>
-                                <input type="number" step="0.01" v-model="form.distance_work_to_start" id="distance_work_to_start" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required readonly />
+                                <input type="number" step="0.01" v-model.number="form.distance_work_to_start" id="distance_work_to_start" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required readonly />
                             </div>
                             <div class="mb-4">
                                 <label for="distance_end_to_home" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Distance End to Home</label>
-                                <input type="number" step="0.01" v-model="form.distance_end_to_home" id="distance_end_to_home" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required readonly />
+                                <input type="number" step="0.01" v-model.number="form.distance_end_to_home" id="distance_end_to_home" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required readonly />
                             </div>
                             <div class="mb-4">
                                 <label for="loading_time_cost_per_hour" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Loading Time Cost Per Hour (£)</label>
-                                <input type="number" step="0.01" v-model="form.loading_time_cost_per_hour" id="loading_time_cost_per_hour" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required min="0" @input="validateInput('loading_time_cost_per_hour')" />
+                                <input type="number" step="0.01" v-model.number="form.loading_time_cost_per_hour" id="loading_time_cost_per_hour" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required min="0" @input="validateInput('loading_time_cost_per_hour')" />
                                 <p v-if="formErrors.loading_time_cost_per_hour" class="text-red-400 text-sm mt-1">{{ formErrors.loading_time_cost_per_hour }}</p>
                             </div>
                             <div class="mb-4">
                                 <label for="loading_time_hours" class="block mb-2 font-medium text-gray-300 h-10 flex items-center leading-tight">Loading Time (Hours)</label>
-                                <input type="number" step="0.01" v-model="form.loading_time_hours" id="loading_time_hours" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required min="0" @input="validateInput('loading_time_hours')" />
+                                <input type="number" step="0.01" v-model.number="form.loading_time_hours" id="loading_time_hours" class="w-full p-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200" required min="0" @input="validateInput('loading_time_hours')" />
                                 <p v-if="formErrors.loading_time_hours" class="text-red-400 text-sm mt-1">{{ formErrors.loading_time_hours }}</p>
                             </div>
                         </div>
@@ -171,7 +171,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, onMounted, onUnmounted } from 'vue';
+import { reactive, ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import mapboxgl from 'mapbox-gl';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -192,17 +192,17 @@ const props = defineProps({
     error: String,
 });
 
-// Form state
+// Form state with parsed numbers
 const form = reactive({
     id: props.profile?.id || null,
     round_id: props.profile?.round_id || Object.keys(props.rounds)[0] || null,
-    fuel_cost_per_unit: props.profile?.fuel_cost_per_unit || 0,
+    fuel_cost_per_unit: parseFloat(props.profile?.fuel_cost_per_unit) || 0,
     distance_unit: props.profile?.distance_unit || 'mile',
-    distance_home_to_work: props.profile?.distance_home_to_work || 0,
-    distance_work_to_start: props.profile?.distance_work_to_start || 0,
-    distance_end_to_home: props.profile?.distance_end_to_home || 0,
-    loading_time_cost_per_hour: props.profile?.loading_time_cost_per_hour || 0,
-    loading_time_hours: props.profile?.loading_time_hours || 0,
+    distance_home_to_work: parseFloat(props.profile?.distance_home_to_work) || 0,
+    distance_work_to_start: parseFloat(props.profile?.distance_work_to_start) || 0,
+    distance_end_to_home: parseFloat(props.profile?.distance_end_to_home) || 0,
+    loading_time_cost_per_hour: parseFloat(props.profile?.loading_time_cost_per_hour) || 0,
+    loading_time_hours: parseFloat(props.profile?.loading_time_hours) || 0,
 });
 
 // Form errors for validation
@@ -216,6 +216,7 @@ const formErrors = reactive({
 const map = ref(null);
 const mapInstance = ref(null);
 const costChart = ref(null);
+const chartInstance = ref(null);
 const locations = ref(props.initialLocations || []);
 const tempLocations = ref([]);
 const tempMarkers = ref([]);
@@ -246,15 +247,18 @@ const totalFuelCost = computed(() => {
         Number(form.distance_home_to_work || 0) +
         Number(form.distance_work_to_start || 0) +
         Number(form.distance_end_to_home || 0);
-    return (totalDistance * Number(form.fuel_cost_per_unit || 0)).toFixed(2);
+    const cost = totalDistance * Number(form.fuel_cost_per_unit || 0);
+    return isNaN(cost) ? '0.00' : cost.toFixed(2);
 });
 
 const loadingTimeCost = computed(() => {
-    return (Number(form.loading_time_hours || 0) * Number(form.loading_time_cost_per_hour || 0)).toFixed(2);
+    const cost = Number(form.loading_time_hours || 0) * Number(form.loading_time_cost_per_hour || 0);
+    return isNaN(cost) ? '0.00' : cost.toFixed(2);
 });
 
 const totalCost = computed(() => {
-    return (Number(totalFuelCost.value) + Number(loadingTimeCost.value)).toFixed(2);
+    const cost = Number(totalFuelCost.value) + Number(loadingTimeCost.value);
+    return isNaN(cost) ? '0.00' : cost.toFixed(2);
 });
 
 // Calculate total cost for a profile (used in profile list)
@@ -265,14 +269,15 @@ const calculateTotalCost = (profile) => {
         Number(profile.distance_end_to_home || 0);
     const fuelCost = totalDistance * Number(profile.fuel_cost_per_unit || 0);
     const loadingCost = Number(profile.loading_time_hours || 0) * Number(profile.loading_time_cost_per_hour || 0);
-    return fuelCost + loadingCost;
+    const total = fuelCost + loadingCost;
+    return isNaN(total) ? 0 : total;
 };
 
 // Input validation
 const validateInput = (field) => {
     formErrors[field] = '';
-    if (form[field] < 0) {
-        formErrors[field] = `${field.replace(/_/g, ' ')} cannot be negative`;
+    if (isNaN(form[field]) || form[field] < 0) {
+        formErrors[field] = `${field.replace(/_/g, ' ')} must be a non-negative number`;
         form[field] = 0;
     } else if (form[field] > 1000) {
         formErrors[field] = `${field.replace(/_/g, ' ')} is too large`;
@@ -684,13 +689,13 @@ onMounted(async () => {
 
     // Initialize Chart.js for cost breakdown
     if (costChart.value) {
-        new Chart(costChart.value, {
+        chartInstance.value = new Chart(costChart.value, {
             type: 'pie',
             data: {
                 labels: ['Fuel Cost', 'Loading Time Cost'],
                 datasets: [{
                     label: 'Cost Breakdown',
-                    data: [totalFuelCost.value, loadingTimeCost.value],
+                    data: [parseFloat(totalFuelCost.value), parseFloat(loadingTimeCost.value)],
                     backgroundColor: ['#22C55E', '#3B82F6'],
                     borderColor: ['#1E3A8A', '#15803D'],
                     borderWidth: 1
@@ -721,8 +726,20 @@ onMounted(async () => {
     }
 });
 
+// Update chart when costs change
+watch([totalFuelCost, loadingTimeCost], () => {
+    if (chartInstance.value) {
+        chartInstance.value.data.datasets[0].data = [
+            parseFloat(totalFuelCost.value) || 0,
+            parseFloat(loadingTimeCost.value) || 0
+        ];
+        chartInstance.value.update();
+    }
+});
+
 onUnmounted(() => {
     if (mapInstance.value) mapInstance.value.remove();
+    if (chartInstance.value) chartInstance.value.destroy();
 });
 
 const clearPins = async () => {
@@ -807,11 +824,14 @@ const submitForm = () => {
     const method = props.isEditing ? 'put' : 'post';
     const url = props.isEditing ? `/service-profile/${form.id}` : '/service-profile';
 
+    // Store form data temporarily
+    const formBackup = { ...form };
+
     router[method](url, {
         ...form,
-        total_fuel_cost: totalFuelCost.value,
-        total_loading_cost: loadingTimeCost.value,
-        total_cost: totalCost.value,
+        total_fuel_cost: parseFloat(totalFuelCost.value) || 0,
+        total_loading_cost: parseFloat(loadingTimeCost.value) || 0,
+        total_cost: parseFloat(totalCost.value) || 0,
     }, {
         onSuccess: (page) => {
             if (!props.isEditing) {
@@ -826,6 +846,8 @@ const submitForm = () => {
         },
         onError: (errors) => {
             console.error('Form submission errors:', errors);
+            // Restore form data on error
+            Object.assign(form, formBackup);
             alert('Failed to save profile: ' + Object.values(errors).join(', '));
         },
     });
