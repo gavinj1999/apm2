@@ -9,14 +9,12 @@ class Location extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
+protected $fillable = [
         'name',
+        'type',
         'latitude',
         'longitude',
         'service_profile_id',
-        'user_id',
-        'created_at',
-        'updated_at',
     ];
 
     public function serviceProfile()

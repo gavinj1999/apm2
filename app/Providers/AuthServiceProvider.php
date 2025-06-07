@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\ServiceProfile;
 use App\Policies\ServiceProfilePolicy;
+use App\Policies\LocationPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 
@@ -16,6 +17,7 @@ class AuthServiceProvider extends ServiceProvider
      */
     protected $policies = [
         ServiceProfile::class => ServiceProfilePolicy::class,
+        Location::class => LocationPolicy::class,
     ];
 
     /**
