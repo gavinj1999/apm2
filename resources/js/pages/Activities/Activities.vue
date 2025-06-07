@@ -37,7 +37,6 @@
 </template>
 
 <script setup>
-import BreezeAuthenticatedLayout from '@/Layouts/Authenticated.vue';
 
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
