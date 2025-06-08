@@ -1,6 +1,6 @@
 <template>
-  <AppLayout>
-
+  <Head title="Activities" />
+  <BreezeAuthenticatedLayout>
     <template #header>
       <h2 class="font-semibold text-xl text-gray-800 leading-tight">
         Recorded Activities
@@ -32,30 +32,21 @@
         </div>
       </div>
     </div>
-
-  </AppLayout>>
+  </BreezeAuthenticatedLayout>
 </template>
 
 <script setup>
+import BreezeAuthenticatedLayout from '@/Layouts/Authenticated.vue';
+import { Head } from '@inertiajs/inertia-vue3';
 
-import { ref, onMounted } from 'vue';
-import axios from 'axios';
-import AppLayout from '@/layouts/AppLayout.vue';
-
-const activities = ref([]);
-
-const fetchActivities = async () => {
-  try {
-    const response = await axios.get('/api/activities');
-    activities.value = response.data.data;
-  } catch (error) {
-    console.error('Error fetching activities:', error);
-  }
-};
+defineProps({
+  activities: {
+    type: Array,
+    default: () => [],
+  },
+});
 
 const formatDate = (dateString) => {
   return new Date(dateString).toLocaleString();
 };
-
-onMounted(fetchActivities);
 </script>
