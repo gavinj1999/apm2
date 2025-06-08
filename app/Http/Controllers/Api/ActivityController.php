@@ -14,8 +14,8 @@ public function store(Request $request)
 {
     $validator = Validator::make($request->all(), [
         'datetime' => 'required|date', // Accepts any valid date format
-        'latitude' => 'required|numeric|between:-90,90',
-        'longitude' => 'required|numeric|between:-180,180',
+        'latitude' => 'numeric|between:-90,90',
+        'longitude' => 'numeric|between:-180,180',
         'activity' => 'required|string',
     ]);
 
