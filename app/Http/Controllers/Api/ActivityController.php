@@ -12,10 +12,11 @@ class ActivityController extends Controller
 {
 public function store(Request $request)
 {
+    dd($request->all());
     $validator = Validator::make($request->all(), [
         'datetime' => 'required|date', // Accepts any valid date format
-        'latitude' => 'numeric|between:-90,90',
-        'longitude' => 'numeric|between:-180,180',
+        'latitude' => 'required|numeric|between:-90,90',
+        'longitude' => 'required|numeric|between:-180,180',
         'activity' => 'required|string',
     ]);
 
