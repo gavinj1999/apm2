@@ -36,7 +36,7 @@
 </template>
 
 <script setup>
-import BreezeAuthenticatedLayout from '@/Layouts/Authenticated.vue';
+import BreezeAuthenticatedLayout from '@/layouts/Authenticated.vue';
 
 
 defineProps({
