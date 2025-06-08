@@ -16,7 +16,7 @@ public function store(Request $request)
         'datetime' => 'required|date', // Accepts any valid date format
         'latitude' => 'required|numeric|between:-90,90',
         'longitude' => 'required|numeric|between:-180,180',
-        'activity' => 'required|string|in:Running,Walking,Cycling',
+        'activity' => 'required|string',
     ]);
 
     if ($validator->fails()) {
