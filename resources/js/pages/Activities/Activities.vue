@@ -1,6 +1,6 @@
 <template>
   <Head title="Activities" />
-  <BreezeAuthenticatedLayout>
+  <AppLayout>
     <template #header>
       <h2 class="font-semibold text-xl text-gray-800 leading-tight">
         Recorded Activities
@@ -32,11 +32,11 @@
         </div>
       </div>
     </div>
-  </BreezeAuthenticatedLayout>
+  </AppLayout>
 </template>
 
 <script setup>
-import BreezeAuthenticatedLayout from '@/layouts/Authenticated.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 
 
 defineProps({
