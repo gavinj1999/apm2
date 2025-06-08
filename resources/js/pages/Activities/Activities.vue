@@ -37,8 +37,6 @@
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-
-
 defineProps({
   activities: {
     type: Array,
