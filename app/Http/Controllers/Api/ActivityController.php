@@ -30,6 +30,10 @@ public function store(Request $request)
     public function index()
     {
         $activities = Activity::latest()->get();
-        return response()->json(['data' => $activities]);
+     
+
+        return Inertia::render('Activities/Index', [
+            'activities' => $activities,
+        ]);
     }
 }
