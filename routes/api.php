@@ -29,5 +29,13 @@ Route::middleware('auth:web')->group(function () {
 });
 
 
-Route::post('/activity', [ActivityController::class, 'store']);
-Route::get('/activities', [ActivityController::class, 'index']);
+
+
+
+Route::middleware('auth:web')->group(function () {
+    Route::get('/activities', [ActivityController::class, 'index']);
+    Route::post('/activities', [ActivityController::class, 'store']);
+    Route::put('/activity/{activity}', [ActivityController::class, 'update']);
+    Route::delete('/activity/{activity}', [ActivityController::class, 'destroy']);
+    Route::get('/activity-dates', [ActivityController::class, 'getActivityDates']);
+});

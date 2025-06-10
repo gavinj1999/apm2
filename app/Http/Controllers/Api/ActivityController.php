@@ -4,38 +4,104 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Activity;
-use Inertia\Inertia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class ActivityController extends Controller
 {
-public function store(Request $request)
-{
-    //dd($request->all());
-    $validator = Validator::make($request->all(), [
-        'datetime' => 'required|date', // Accepts any valid date format
-        'latitude' => 'required|numeric',
-        'longitude' => 'required|numeric',
-        'activity' => 'required|string',
-    ]);
+    public function store(Request $request)
+    {
+        Log::info('ActivityController::store called', ['request' => $request->all()]);
 
-    if ($validator->fails()) {
-        return response()->json(['errors' => $validator->errors()], 422);
+        $validator = Validator::make($request->all(), [
+            'datetime' => 'required|date',
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
+            'activity' => 'required|string|in:Running,Walking,Cycling',
+        ]);
+
+        if ($validator->fails()) {
+            Log::error('Validation failed', ['errors' => $validator->errors()]);
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $data = $request->only(['latitude', 'longitude', 'activity']);
+        $data['datetime'] = \Carbon\Carbon::parse($request->datetime)->setTimezone('UTC');
+        $data['latitude'] = (float) $request->latitude;
+        $data['longitude'] = (float) $request->longitude;
+
+        $activity = Activity::create($data);
+
+        Log::info('Activity created', ['activity' => $activity]);
+
+        return response()->json(['message' => 'Activity recorded successfully', 'data' => $activity], 201);
     }
 
-    $activity = Activity::create($request->only(['datetime', 'latitude', 'longitude', 'activity']));
-
-    return response()->json(['message' => 'Activity recorded successfully', 'data' => $activity], 201);
-}
-
-    public function index()
+    public function index(Request $request)
     {
-        $activities = Activity::latest()->get();
-     
+        Log::info('ActivityController::index called', ['request' => $request->all()]);
 
-        return Inertia::render('Activities/Index', [
-            'activities' => $activities,
+        $query = Activity::latest();
+
+        if ($request->has('date')) {
+            $date = \Carbon\Carbon::parse($request->date)->startOfDay();
+            $query->whereDate('datetime', $date);
+        }
+
+        $activities = $query->get()->map(function ($activity) {
+            return [
+                'id' => $activity->id,
+                'datetime' => $activity->datetime->toISOString(),
+                'latitude' => (float) $activity->latitude,
+                'longitude' => (float) $activity->longitude,
+                'activity' => $activity->activity,
+            ];
+        });
+
+        return response()->json(['data' => $activities]);
+    }
+
+    public function update(Request $request, Activity $activity)
+    {
+        Log::info('ActivityController::update called', ['request' => $request->all(), 'activity_id' => $activity->id]);
+
+        $validator = Validator::make($request->all(), [
+            'datetime' => 'required|date',
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
+            'activity' => 'required|string|in:Running,Walking,Cycling',
         ]);
+
+        if ($validator->fails()) {
+            Log::error('Validation failed', ['errors' => $validator->errors()]);
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $data = $request->only(['latitude', 'longitude', 'activity']);
+        $data['datetime'] = \Carbon\Carbon::parse($request->datetime)->setTimezone('UTC');
+
+        $activity->update($data);
+
+        Log::info('Activity updated', ['activity' => $activity]);
+
+        return response()->json(['message' => 'Activity updated successfully', 'data' => [
+            'id' => $activity->id,
+            'datetime' => $activity->datetime->toISOString(),
+            'latitude' => (float) $activity->latitude,
+            'longitude' => (float) $activity->longitude,
+            'activity' => $activity->activity,
+        ]]);
+    }
+
+    public function destroy(Activity $activity)
+    {
+        Log::info('ActivityController::destroy called', ['activity_id' => $activity->id]);
+
+        $activity->delete();
+
+        Log::info('Activity deleted', ['activity_id' => $activity->id]);
+
+        return response()->json(['message' => 'Activity deleted successfully']);
     }
 }

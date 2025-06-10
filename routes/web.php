@@ -11,6 +11,7 @@ use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\ParcelTypeController;
 use App\Http\Controllers\ServiceProfileController;
 use App\Http\Controllers\LocationController;
+use App\Http\Controllers\ActivityController;
 
 
 
@@ -58,6 +59,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/service-profile/{id}', [ServiceProfileController::class, 'update'])->name('service-profile.update');
     Route::delete('/service-profile/{id}', [ServiceProfileController::class, 'destroy'])->name('service-profile.destroy');
 
+    Route::get('/activities', [ActivityController::class, 'index'])->name('activities');
 
 
 });

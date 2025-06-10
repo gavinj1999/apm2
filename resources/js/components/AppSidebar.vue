@@ -39,7 +39,7 @@ const mainNavItems: NavItem[] = [
     },
         {
         title: 'Activities',
-        href: '/api/activities',
+        href: '/activities',
         icon: LayoutGrid,
     },
 ];
