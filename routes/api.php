@@ -28,7 +28,8 @@ Route::middleware('auth:web')->group(function () {
     Route::post('/work-locations', [WorkLocationController::class, 'store']);
 });
 
-
+Route::post('/activity', [ActivityController::class, 'store']);
+Route::get('/activities', [ActivityController::class, 'index']);
 
 
 
