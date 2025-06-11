@@ -9,7 +9,8 @@ class Activity extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['datetime', 'latitude', 'longitude', 'activity'];
+        protected $fillable = ['datetime', 'latitude', 'longitude', 'activity', 'is_manual'];
+    protected $dates = ['datetime'];
 
     protected $casts = [
         'datetime' => 'datetime',
