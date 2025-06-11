@@ -37,6 +37,13 @@ class ActivityController extends Controller
                 return $date->format('Y-m-d');
             });
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'activities' => $activities,
+                'activityDates' => $activityDates,
+            ]);
+        }
+
         return Inertia::render('Activities/Index', [
             'activities' => $activities,
             'activityDates' => $activityDates,
@@ -56,6 +63,20 @@ class ActivityController extends Controller
 
         $activity = Activity::create($validated + ['is_manual' => $request->input('is_manual', false)]);
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'data' => [
+                    'id' => $activity->id,
+                    'datetime' => $activity->datetime->toISOString(),
+                    'latitude' => (float) $activity->latitude,
+                    'longitude' => (float) $activity->longitude,
+                    'activity' => $activity->activity,
+                    'is_manual' => $activity->is_manual,
+                ],
+                'message' => 'Activity created successfully',
+            ], 201);
+        }
+
         return redirect()->route('activities')->with('success', 'Activity created successfully');
     }
 
@@ -71,6 +92,20 @@ class ActivityController extends Controller
 
         $activity->update($validated);
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'data' => [
+                    'id' => $activity->id,
+                    'datetime' => $activity->datetime->toISOString(),
+                    'latitude' => (float) $activity->latitude,
+                    'longitude' => (float) $activity->longitude,
+                    'activity' => $activity->activity,
+                    'is_manual' => $activity->is_manual,
+                ],
+                'message' => 'Activity updated successfully',
+            ]);
+        }
+
         return redirect()->route('activities')->with('success', 'Activity updated successfully');
     }
 
@@ -85,12 +120,31 @@ class ActivityController extends Controller
 
         $activity->update(array_filter($validated));
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'data' => [
+                    'id' => $activity->id,
+                    'datetime' => $activity->datetime->toISOString(),
+                    'latitude' => (float) $activity->latitude,
+                    'longitude' => (float) $activity->longitude,
+                    'activity' => $activity->activity,
+                    'is_manual' => $activity->is_manual,
+                ],
+                'message' => 'Activity updated successfully',
+            ]);
+        }
+
         return redirect()->route('activities')->with('success', 'Activity updated successfully');
     }
 
     public function destroy(Activity $activity)
     {
         $activity->delete();
+
+        if (request()->expectsJson()) {
+            return response()->json(null, 204);
+        }
+
         return redirect()->route('activities')->with('success', 'Activity deleted successfully');
     }
 }

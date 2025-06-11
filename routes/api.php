@@ -32,10 +32,10 @@ Route::middleware('auth:web')->group(function () {
 
 
 
-Route::middleware('auth:web')->group(function () {
+Route::middleware('auth:sanctum')->group(function () {
     Route::get('/activities', [ActivityController::class, 'index']);
     Route::post('/activities', [ActivityController::class, 'store']);
     Route::put('/activity/{activity}', [ActivityController::class, 'update']);
+    Route::patch('/activity/{activity}', [ActivityController::class, 'patch']);
     Route::delete('/activity/{activity}', [ActivityController::class, 'destroy']);
-    Route::get('/activity-dates', [ActivityController::class, 'getActivityDates']);
 });
