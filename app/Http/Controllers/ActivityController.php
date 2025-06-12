@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Http\Controllers;
@@ -61,7 +62,19 @@ class ActivityController extends Controller
             'is_manual' => 'sometimes|boolean',
         ]);
 
-        $activity = Activity::create($validated + ['is_manual' => $request->input('is_manual', false)]);
+        // Adjust datetime to account for BST (subtract 1 hour if in BST)
+        $datetime = Carbon::parse($validated['datetime']);
+        if ($datetime->isDST() && $datetime->timezoneName === 'Europe/London') {
+            $datetime->subHour();
+        }
+
+        $activity = Activity::create([
+            'datetime' => $datetime,
+            'latitude' => $validated['latitude'],
+            'longitude' => $validated['longitude'],
+            'activity' => $validated['activity'],
+            'is_manual' => $request->input('is_manual', false),
+        ]);
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -90,6 +103,13 @@ class ActivityController extends Controller
             'is_manual' => 'sometimes|boolean',
         ]);
 
+        // Adjust datetime to account for BST (subtract 1 hour if in BST)
+        $datetime = Carbon::parse($validated['datetime']);
+        if ($datetime->isDST() && $datetime->timezoneName === 'Europe/London') {
+            $datetime->subHour();
+        }
+        $validated['datetime'] = $datetime;
+
         $activity->update($validated);
 
         if ($request->expectsJson()) {
@@ -117,6 +137,14 @@ class ActivityController extends Controller
             'longitude' => 'sometimes|nullable|numeric|between:-180,180',
             'is_manual' => 'sometimes|boolean',
         ]);
+
+        if (isset($validated['datetime'])) {
+            $datetime = Carbon::parse($validated['datetime']);
+            if ($datetime->isDST() && $datetime->timezoneName === 'Europe/London') {
+                $datetime->subHour();
+            }
+            $validated['datetime'] = $datetime;
+        }
 
         $activity->update(array_filter($validated));
 
