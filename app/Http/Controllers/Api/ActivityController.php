@@ -18,7 +18,7 @@ class ActivityController extends Controller
             'datetime' => 'required|date',
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
-            'activity' => 'required|string|in:Running,Walking,Cycling',
+            'activity' => 'required|string|in:Left Home,Arrive Depot,Start Loading,Leave Depot,First Drop,Last Drop,Arrive Home',
         ]);
 
         if ($validator->fails()) {
@@ -70,7 +70,7 @@ class ActivityController extends Controller
             'datetime' => 'required|date',
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
-            'activity' => 'required|string|in:Running,Walking,Cycling',
+            'activity' => 'required|string|in:Left Home,Arrive Depot,Start Loading,Leave Depot,First Drop,Last Drop,Arrive Home',
         ]);
 
         if ($validator->fails()) {
