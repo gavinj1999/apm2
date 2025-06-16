@@ -581,7 +581,7 @@ import mapboxgl from 'mapbox-gl';
 import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder';
 import VueCal from 'vue-cal';
 import 'vue-cal/dist/vuecal.css';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 import axios from 'axios';
 import { debounce } from 'lodash';
 
