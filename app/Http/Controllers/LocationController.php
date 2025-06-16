@@ -4,68 +4,68 @@ namespace App\Http\Controllers;
 
 use App\Models\Location;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
 
 class LocationController extends Controller
 {
-public function index(Request $request)
-{
-    \Log::info('LocationController::index', [
-        'user_id' => Auth::id() ?? 'null',
-        'params' => $request->all(),
-        'cookies' => $request->cookies->all(),
-        'headers' => $request->headers->all(),
-    ]);
-    try {
-        $this->authorize('viewAny', Location::class);
-    } catch (\Exception $e) {
-        \Log::error('Authorization failed', [
-            'error' => $e->getMessage(),
-            'user_id' => Auth::id(),
-        ]);
-        throw $e;
-    }
-    $query = Location::query();
-    if ($request->has('type')) {
-        $query->where('type', $request->query('type'));
-    }
-    if ($request->has('service_profile_id')) {
-        $query->where('service_profile_id', $request->query('service_profile_id'));
-    }
-    return response()->json($query->get());
-}
     public function store(Request $request)
     {
-        $this->authorize('create', Location::class);
         $validated = $request->validate([
-            'name' => 'nullable|string|max:255',
-            'type' => 'required|in:Home,Depot,Start Rounds,End Rounds',
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
-            'service_profile_id' => 'nullable|exists:service_profiles,id',
+            'name' => 'required|string|unique:locations,name|max:255',
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
         ]);
 
         $location = Location::create($validated);
-        return response()->json($location, 201);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'data' => [
+                    'id' => $location->id,
+                    'name' => $location->name,
+                    'latitude' => (float) $location->latitude,
+                    'longitude' => (float) $location->longitude,
+                ],
+                'message' => 'Location created successfully',
+            ], 201);
+        }
+
+        return redirect()->route('activities')->with('success', 'Location created successfully');
     }
 
     public function update(Request $request, Location $location)
     {
-        $this->authorize('update', $location);
         $validated = $request->validate([
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
-            'service_profile_id' => 'required|exists:service_profiles,id',
+            'name' => 'required|string|unique:locations,name,' . $location->id . '|max:255',
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
         ]);
 
         $location->update($validated);
-        return response()->json($location);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'data' => [
+                    'id' => $location->id,
+                    'name' => $location->name,
+                    'latitude' => (float) $location->latitude,
+                    'longitude' => (float) $location->longitude,
+                ],
+                'message' => 'Location updated successfully',
+            ]);
+        }
+
+        return redirect()->route('activities')->with('success', 'Location updated successfully');
     }
 
     public function destroy(Location $location)
     {
-        $this->authorize('delete', $location);
         $location->delete();
-        return response()->json(null, 204);
+
+        if (request()->expectsJson()) {
+            return response()->json(null, 204);
+        }
+
+        return redirect()->route('activities')->with('success', 'Location deleted successfully');
     }
 }

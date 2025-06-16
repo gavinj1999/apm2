@@ -64,65 +64,23 @@
                 :scroll-to="{ hour: 7 }"
               />
             </div>
-            <!-- Pagination Controls -->
-            <div class="mb-4 flex justify-between items-center">
-              <div class="flex space-x-2">
-                <button
-                  @click="changePage(activities.prev_page_url)"
-                  :disabled="!activities.prev_page_url"
-                  class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500 text-sm disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                <span class="text-white text-sm self-center">
-                  Page {{ activities.current_page }} of {{ activities.last_page }}
-                </span>
-                <button
-                  @click="changePage(activities.next_page_url)"
-                  :disabled="!activities.next_page_url"
-                  class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500 text-sm disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-              <select
-                v-model="perPage"
-                @change="updatePerPage"
-                class="rounded-md bg-gray-700 border-gray-600 text-white text-sm p-1"
-              >
-                <option value="10">10 per page</option>
-                <option value="20">20 per page</option>
-                <option value="50">50 per page</option>
-              </select>
-            </div>
             <!-- Table -->
             <table class="min-w-full divide-y divide-gray-700">
               <thead class="bg-gray-900">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Date</th>
-                  <th v-for="type in activityTypes" :key="type.name" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    {{ type.alias }}
-                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Activity</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Time</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Latitude</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Longitude</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody class="bg-gray-800 divide-y divide-gray-700">
                 <template v-for="(group, date) in groupedActivities" :key="date">
                   <tr class="bg-gray-900">
-                    <td class="px-6 py-2 text-sm font-sm text-gray-300 cursor-pointer" @click="toggleExpand(date)">
-                      <div class="flex items-center">
-                        <ChevronDownIcon v-if="isExpanded[date]" class="w-4 h-4 mr-2" />
-                        <ChevronRightIcon v-else class="w-4 h-4 mr-2" />
-                        {{ formatDate(date, 'date') }}
-                      </div>
-                    </td>
-                    <td v-for="type in activityTypes" :key="type.name" class="px-6 py-2 text-sm font-sm text-gray-300 text-center">
-                      <span v-if="group.some(act => act.activity === type.name && act.id)" class="text-green-400">✔</span>
-                      <span v-else class="text-red-400">✘</span>
-                    </td>
-                    <td class="px-6 py-2"></td>
+                    <td colspan="5" class="px-6 py-2 text-sm font-sm text-gray-300">{{ formatDate(date, 'date') }}</td>
                   </tr>
-                  <tr v-if="isExpanded[date]" v-for="activity in group" :key="activity.id || activity.activity" class="bg-gray-800">
+                  <tr v-for="activity in group" :key="activity.id || activity.activity">
                     <td class="px-6 py-4 whitespace-nowrap text-white text-sm" :class="{ 'italic': activity.is_manual }">
                       {{ getAlias(activity.activity) }}
                     </td>
@@ -186,7 +144,7 @@
                   </tr>
                 </template>
                 <tr v-if="!Object.keys(groupedActivities).length">
-                  <td :colspan="activityTypes.length + 1" class="px-6 py-4 text-center text-gray-300 text-sm">No activities found</td>
+                  <td colspan="5" class="px-6 py-4 text-center text-gray-300 text-sm">No activities found</td>
                 </tr>
               </tbody>
             </table>
@@ -205,21 +163,21 @@
             <input
               v-model="newLocation.name"
               placeholder="Location Name (e.g., Home, Depot)"
-              class="border rounded p-2 border-gray-600 bg-gray-700 text-white flex-1"
+              class="border rounded p-2 flex-1 bg-gray-700 text-white"
             />
             <input
               v-model="newLocation.latitude"
               type="number"
               step="any"
               placeholder="Latitude"
-              class="border rounded p-2 border-gray-600 bg-gray-700 text-white w-32"
+              class="border rounded p-2 w-32 bg-gray-700 text-white"
             />
             <input
               v-model="newLocation.longitude"
               type="number"
               step="any"
               placeholder="Longitude"
-              class="border rounded p-2 border-gray-600 bg-gray-700 text-white w-32"
+              class="border rounded p-2 w-32 bg-gray-700 text-white"
             />
             <button
               @click="addLocation"
@@ -239,7 +197,7 @@
               type="text"
               id="locationMapSearch"
               v-model="locationSearchQuery"
-              @input="debounceSearch('location')"
+              @input="debounceSearch"
               placeholder="Enter city or address"
               class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             />
@@ -251,7 +209,7 @@
               <li
                 v-for="suggestion in addressSuggestions"
                 :key="suggestion.id"
-                @click="selectAddress(suggestion, 'location')"
+                @click="selectAddress(suggestion)"
                 class="px-4 py-2 text-white text-sm hover:bg-gray-600 cursor-pointer"
               >
                 {{ suggestion.place_name }}
@@ -268,15 +226,15 @@
         <table class="w-full border-collapse">
           <thead>
             <tr class="bg-gray-900">
-              <th class="border border-gray-600 p-2 text-left text-xs font-medium text-gray-300 uppercase">Name</th>
-              <th class="border border-gray-600 p-2 text-left text-xs font-medium text-gray-300 uppercase">Latitude</th>
-              <th class="border border-gray-600 p-2 text-left text-xs font-medium text-gray-300 uppercase">Longitude</th>
-              <th class="border border-gray-600 p-2 text-left text-xs font-medium text-gray-300 uppercase">Actions</th>
+              <th class="border p-2 text-left text-xs font-medium text-gray-300 uppercase">Name</th>
+              <th class="border p-2 text-left text-xs font-medium text-gray-300 uppercase">Latitude</th>
+              <th class="border p-2 text-left text-xs font-medium text-gray-300 uppercase">Longitude</th>
+              <th class="border p-2 text-left text-xs font-medium text-gray-300 uppercase">Actions</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="location in locations" :key="location.id" class="hover:bg-gray-700">
-              <td class="border border-gray-600 p-2">
+              <td class="border p-2">
                 <input
                   v-if="editingLocationId === location.id"
                   v-model="editLocationForm.name"
@@ -284,7 +242,7 @@
                 />
                 <span v-else class="text-white text-sm">{{ location.name }}</span>
               </td>
-              <td class="border border-gray-600 p-2">
+              <td class="border p-2">
                 <input
                   v-if="editingLocationId === location.id"
                   v-model="editLocationForm.latitude"
@@ -294,7 +252,7 @@
                 />
                 <span v-else class="text-white text-sm">{{ location.latitude }}</span>
               </td>
-              <td class="border border-gray-600 p-2">
+              <td class="border p-2">
                 <input
                   v-if="editingLocationId === location.id"
                   v-model="editLocationForm.longitude"
@@ -304,7 +262,7 @@
                 />
                 <span v-else class="text-white text-sm">{{ location.longitude }}</span>
               </td>
-              <td class="border border-gray-600 p-2">
+              <td class="border p-2">
                 <button
                   v-if="editingLocationId === location.id"
                   @click="updateLocation"
@@ -449,30 +407,15 @@
             <div v-if="$page.props.errors.datetime" class="text-red-400 text-sm mt-1">{{ $page.props.errors.datetime }}</div>
           </div>
           <!-- Map Search -->
-          <div class="mb-4 relative" v-if="!isFixedLocationActivity(createForm.activity)">
-            <label for="createMapSearch" class="block text-sm font-medium text-gray-300">Search Location</label>
+          <div class="mb-4" v-if="!isFixedLocationActivity(createForm.activity)">
+            <label for="mapSearch" class="block text-sm font-medium text-gray-300">Search Location</label>
             <input
               type="text"
-              id="createMapSearch"
+              id="mapSearch"
               v-model="searchQuery"
-              @input="debounceSearch('create')"
               placeholder="Enter city or address"
               class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             />
-            <div v-if="searchError" class="text-red-400 text-sm mt-1">{{ searchError }}</div>
-            <ul
-              v-if="addressSuggestions.length"
-              class="absolute z-10 w-full bg-gray-700 border border-gray-600 rounded-md mt-1 max-h-48 overflow-y-auto"
-            >
-              <li
-                v-for="suggestion in addressSuggestions"
-                :key="suggestion.id"
-                @click="selectAddress(suggestion, 'create')"
-                class="px-4 py-2 text-white text-sm hover:bg-gray-600 cursor-pointer"
-              >
-                {{ suggestion.place_name }}
-              </li>
-            </ul>
           </div>
           <!-- Map -->
           <div v-if="mapboxToken && !isFixedLocationActivity(createForm.activity)" class="mb-4 h-96">
@@ -509,7 +452,6 @@
           </div>
           <div class="mb-4" v-if="isFixedLocationActivity(createForm.activity)">
             <p class="text-gray-300 text-sm">Location will be set to {{ getFixedLocationName(createForm.activity) }}</p>
-            <div v-if="createLocationError" class="text-red-400 text-sm mt-1">{{ createLocationError }}</div>
           </div>
           <div class="mb-4">
             <label for="createActivity" class="block text-sm font-medium text-gray-300">Activity</label>
@@ -606,7 +548,6 @@
           </div>
           <div class="mb-4" v-if="isFixedLocationActivity(manualForm.activity)">
             <p class="text-gray-300 text-sm">Location will be set to {{ getFixedLocationName(manualForm.activity) }}</p>
-            <div v-if="manualLocationError" class="text-red-400 text-sm mt-1">{{ manualLocationError }}</div>
           </div>
           <div class="flex justify-end">
             <button
@@ -633,7 +574,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed, nextTick } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import { Head } from '@inertiajs/vue3';
 import mapboxgl from 'mapbox-gl';
@@ -641,14 +582,13 @@ import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder';
 import VueCal from 'vue-cal';
 import 'vue-cal/dist/vuecal.css';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/vue/24/solid';
 import axios from 'axios';
 import { debounce } from 'lodash';
 
 const props = defineProps({
   activities: {
-    type: Object,
-    default: () => ({ data: [], current_page: 1, last_page: 1, prev_page_url: null, next_page_url: null }),
+    type: Array,
+    default: () => [],
   },
   activityDates: {
     type: Array,
@@ -662,10 +602,6 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  parcelTypes: {
-    type: Array,
-    default: () => [],
-  },
   mapboxToken: {
     type: String,
     required: false,
@@ -675,7 +611,7 @@ const props = defineProps({
 });
 
 const dateFilter = ref(new Date());
-const localActivities = ref(props.activities.data);
+const localActivities = ref(props.activities);
 const showEditModal = ref(false);
 const showCreateModal = ref(false);
 const showManualModal = ref(false);
@@ -686,8 +622,6 @@ const locationSearchQuery = ref('');
 const addressSuggestions = ref([]);
 const searchError = ref('');
 const locationError = ref('');
-const manualLocationError = ref('');
-const createLocationError = ref('');
 const isCreatingActivity = ref(false);
 const isEditingActivity = ref(false);
 const isSavingManual = ref(false);
@@ -700,8 +634,6 @@ const highlightedEvent = ref(null);
 const highlightedMarker = ref(null);
 const markers = ref({});
 const manualDate = ref('');
-const isExpanded = ref({});
-const perPage = ref('10');
 let map = null;
 let createMap = null;
 let createMarker = null;
@@ -750,7 +682,7 @@ const editLocationForm = ref({
 // Find matching location for an activity's coordinates
 const findMatchingLocation = (latitude, longitude) => {
   if (!latitude || !longitude) return '';
-  const tolerance = 0.000001;
+  const tolerance = 0.000001; // Handle floating-point precision
   return props.locations.find(loc => 
     Math.abs(parseFloat(loc.latitude) - parseFloat(latitude)) < tolerance &&
     Math.abs(parseFloat(loc.longitude) - parseFloat(longitude)) < tolerance
@@ -759,65 +691,10 @@ const findMatchingLocation = (latitude, longitude) => {
 
 // Initialize selectedLocation for all activities
 const initializeSelectedLocations = () => {
-  props.activities.data.forEach(activity => {
+  props.activities.forEach(activity => {
     if (activity.id) {
       selectedLocation.value[activity.id] = findMatchingLocation(activity.latitude, activity.longitude);
     }
-  });
-};
-
-// Format date with local timezone (BST)
-const formatDate = (dateString, type) => {
-  if (!dateString) return '-';
-  const date = new Date(dateString);
-  const options = {
-    timeZone: 'Europe/London',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  };
-  if (type === 'date') {
-    return date.toLocaleDateString('en-GB', { ...options, day: '2-digit', month: '2-digit', year: 'numeric' });
-  } else if (type === 'time') {
-    return date.toLocaleTimeString('en-GB', { ...options, hour: '2-digit', minute: '2-digit' });
-  }
-  return date.toLocaleString('en-GB', options);
-};
-
-// Toggle expand/collapse for a date
-const toggleExpand = (date) => {
-  isExpanded.value[date] = !isExpanded.value[date];
-};
-
-// Change pagination page
-const changePage = (url) => {
-  if (!url) return;
-  router.get(url, { date: dateFilter.value.toISOString().split('T')[0], per_page: perPage.value }, {
-    preserveState: true,
-    preserveScroll: true,
-    onSuccess: () => {
-      localActivities.value = props.activities.data;
-      initializeSelectedLocations();
-      updateCalendarEvents();
-      updateMapMarkers();
-    },
-  });
-};
-
-// Update items per page
-const updatePerPage = () => {
-  router.get('/activities', { date: dateFilter.value.toISOString().split('T')[0], per_page: perPage.value }, {
-    preserveState: true,
-    preserveScroll: true,
-    onSuccess: () => {
-      localActivities.value = props.activities.data;
-      initializeSelectedLocations();
-      updateCalendarEvents();
-      updateMapMarkers();
-    },
   });
 };
 
@@ -851,7 +728,7 @@ const mapStyles = [
 ];
 const selectedMapStyle = ref(mapStyles[0].id);
 
-const calendarEvents = ref(props.activities.data.map((activity) => ({
+const calendarEvents = ref(props.activities.map((activity) => ({
   id: activity.id,
   start: new Date(activity.datetime),
   end: new Date(new Date(activity.datetime).getTime() + 30 * 60000),
@@ -861,7 +738,16 @@ const calendarEvents = ref(props.activities.data.map((activity) => ({
 
 const groupedActivities = computed(() => {
   const groups = {};
-  props.activities.data.forEach((activity) => {
+  const activities = [...props.activities].sort((a, b) => {
+    const dateA = new Date(a.datetime).toISOString().split('T')[0];
+    const dateB = new Date(b.datetime).toISOString().split('T')[0];
+    if (dateA !== dateB) return dateA.localeCompare(dateB);
+    const orderA = props.activityTypes.findIndex((t) => t.name === a.activity);
+    const orderB = props.activityTypes.findIndex((t) => t.name === b.activity);
+    return orderA - orderB;
+  });
+
+  activities.forEach((activity) => {
     const date = new Date(activity.datetime).toISOString().split('T')[0];
     if (!groups[date]) groups[date] = [];
     groups[date].push(activity);
@@ -890,7 +776,7 @@ const groupedActivities = computed(() => {
 
 const hasDuplicates = (activity) => {
   if (!activity.id) return false;
-  return props.activities.data.some((other) => {
+  return props.activities.some((other) => {
     if (other.id === activity.id) return false;
     const activityDate = new Date(activity.datetime).toISOString().split('T')[0];
     const otherDate = new Date(other.datetime).toISOString().split('T')[0];
@@ -902,7 +788,7 @@ const markAsCorrect = (activity) => {
   if (!confirm('Mark this as the correct activity and delete duplicates?')) return;
   router.post(`/activity/${activity.id}/mark-as-correct`, { id: activity.id }, {
     onSuccess: () => {
-      localActivities.value = props.activities.data;
+      localActivities.value = props.activities;
       initializeSelectedLocations();
       updateCalendarEvents();
     },
@@ -912,24 +798,20 @@ const markAsCorrect = (activity) => {
   });
 };
 
+const formatDate = (dateString, type) => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  if (type === 'date') {
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  } else if (type === 'time') {
+    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+  return date.toLocaleString();
+};
+
 const createFormSubmit = () => {
   isCreatingActivity.value = true;
   locationError.value = '';
-  createLocationError.value = '';
-
-  // Set coordinates for fixed-location activities
-  if (isFixedLocationActivity(createForm.activity)) {
-    const locationName = getFixedLocationName(createForm.activity);
-    const location = props.locations.find(loc => loc.name === locationName);
-    if (!location) {
-      createLocationError.value = `${locationName} location not found. Please add it in Manage Locations.`;
-      isCreatingActivity.value = false;
-      return;
-    }
-    createForm.latitude = location.latitude;
-    createForm.longitude = location.longitude;
-  }
-
   console.log('Creating activity:', createForm.data());
   createForm.post('/activities', {
     preserveState: true,
@@ -942,7 +824,7 @@ const createFormSubmit = () => {
         only: ['activities', 'activityDates'],
         preserveState: true,
         onSuccess: () => {
-          localActivities.value = props.activities.data;
+          localActivities.value = props.activities;
           initializeSelectedLocations();
           updateCalendarEvents();
           updateMapMarkers();
@@ -972,7 +854,7 @@ const editFormSubmit = () => {
         only: ['activities'],
         preserveState: true,
         onSuccess: () => {
-          localActivities.value = props.activities.data;
+          localActivities.value = props.activities;
           initializeSelectedLocations();
           updateCalendarEvents();
           updateMapMarkers();
@@ -992,21 +874,6 @@ const editFormSubmit = () => {
 const manualFormSubmit = () => {
   isSavingManual.value = true;
   locationError.value = '';
-  manualLocationError.value = '';
-
-  // Set coordinates for fixed-location activities
-  if (isFixedLocationActivity(manualForm.activity)) {
-    const locationName = getFixedLocationName(manualForm.activity);
-    const location = props.locations.find(loc => loc.name === locationName);
-    if (!location) {
-      manualLocationError.value = `${locationName} location not found. Please add it in Manage Locations.`;
-      isSavingManual.value = false;
-      return;
-    }
-    manualForm.latitude = location.latitude;
-    manualForm.longitude = location.longitude;
-  }
-
   console.log('Saving manual activity:', manualForm.data());
   manualForm.post('/activities', {
     preserveState: true,
@@ -1019,7 +886,7 @@ const manualFormSubmit = () => {
         only: ['activities', 'activityDates'],
         preserveState: true,
         onSuccess: () => {
-          localActivities.value = props.activities.data;
+          localActivities.value = props.activities;
           initializeSelectedLocations();
           updateCalendarEvents();
           updateMapMarkers();
@@ -1062,7 +929,7 @@ const updateActivityLocation = (activityId, locationId) => {
         only: ['activities'],
         preserveState: true,
         onSuccess: () => {
-          localActivities.value = props.activities.data;
+          localActivities.value = props.activities;
           initializeSelectedLocations();
           updateCalendarEvents();
           updateMapMarkers();
@@ -1073,8 +940,8 @@ const updateActivityLocation = (activityId, locationId) => {
       props.errors.global = Object.values(errors).join(', ') || 'Failed to update activity location';
       console.error('Update activity location errors:', errors);
       selectedLocation.value[activityId] = findMatchingLocation(
-        props.activities.data.find(act => act.id === activityId)?.latitude,
-        props.activities.data.find(act => act.id === activityId)?.longitude
+        props.activities.find(act => act.id === activityId)?.latitude,
+        props.activities.find(act => act.id === activityId)?.longitude
       );
     },
     onFinish: () => {
@@ -1090,7 +957,7 @@ const openLocationModal = () => {
   addressSuggestions.value = [];
   searchError.value = '';
   locationError.value = '';
-  nextTick(() => initLocationMap());
+  setTimeout(() => initLocationMap(), 0);
 };
 
 const addLocation = () => {
@@ -1134,7 +1001,7 @@ const startEditLocation = (location) => {
   addressSuggestions.value = [];
   searchError.value = '';
   locationError.value = '';
-  nextTick(() => initLocationMap());
+  setTimeout(() => initLocationMap(), 0);
   if (location.latitude && location.longitude) {
     updateLocationMarker(location.longitude, location.latitude);
   }
@@ -1207,23 +1074,22 @@ const deleteLocation = (location) => {
   });
 };
 
-const debounceSearch = debounce(async (context) => {
+const searchAddresses = async () => {
   if (!props.mapboxToken) {
     searchError.value = 'Mapbox token is missing';
     addressSuggestions.value = [];
     return;
   }
 
-  const query = context === 'create' ? searchQuery.value : locationSearchQuery.value;
-  if (!query.trim()) {
+  if (!locationSearchQuery.value.trim()) {
     addressSuggestions.value = [];
     searchError.value = '';
     return;
   }
 
   try {
-    console.log(`Searching for (${context}):`, query);
-    const response = await axios.get('https://api.mapbox.com/geocoding/v5/mapbox.places/' + encodeURIComponent(query) + '.json', {
+    console.log('Searching for:', locationSearchQuery.value);
+    const response = await axios.get('https://api.mapbox.com/geocoding/v5/mapbox.places/' + encodeURIComponent(locationSearchQuery.value) + '.json', {
       params: {
         access_token: props.mapboxToken,
         proximity: '-2.490,53.074',
@@ -1244,33 +1110,22 @@ const debounceSearch = debounce(async (context) => {
     }
     addressSuggestions.value = [];
   }
-}, 300);
+};
 
-const selectAddress = (suggestion, context) => {
+const debounceSearch = debounce(searchAddresses, 300);
+
+const selectAddress = (suggestion) => {
   const [lng, lat] = suggestion.center;
-  if (context === 'create') {
-    createForm.latitude = lat;
-    createForm.longitude = lng;
-    if (createMap) {
-      updateCreateMarker(lng, lat);
-      createMap.flyTo({ center: [lng, lat], zoom: 14 });
-    }
-    searchQuery.value = suggestion.place_name;
+  if (editingLocationId.value) {
+    editLocationForm.value.latitude = lat;
+    editLocationForm.value.longitude = lng;
   } else {
-    if (editingLocationId.value) {
-      editLocationForm.value.latitude = lat;
-      editLocationForm.value.longitude = lng;
-    } else {
-      newLocation.value.latitude = lat;
-      newLocation.value.longitude = lng;
-    }
-    if (locationMap) {
-      updateLocationMarker(lng, lat);
-      locationMap.flyTo({ center: [lng, lat], zoom: 14 });
-    }
-    locationSearchQuery.value = suggestion.place_name;
+    newLocation.value.latitude = lat;
+    newLocation.value.longitude = lng;
   }
+  updateLocationMarker(lng, lat);
   addressSuggestions.value = [];
+  locationSearchQuery.value = suggestion.place_name;
   searchError.value = '';
 };
 
@@ -1278,12 +1133,6 @@ const initLocationMap = () => {
   if (!props.mapboxToken) {
     props.errors.global = 'Mapbox token is missing';
     searchError.value = 'Mapbox token is missing';
-    return;
-  }
-
-  const container = document.getElementById('locationMap');
-  if (!container) {
-    console.warn('Location map container not found');
     return;
   }
 
@@ -1338,7 +1187,7 @@ const handleEventDrop = ({ event }) => {
   const newDatetime = event.start.toISOString();
   router.patch(`/activity/${activity.id}`, { datetime: newDatetime }, {
     onSuccess: () => {
-      localActivities.value = props.activities.data;
+      localActivities.value = props.activities;
       initializeSelectedLocations();
       updateCalendarEvents();
     },
@@ -1380,7 +1229,7 @@ const clearHighlights = () => {
 };
 
 const updateCalendarEvents = () => {
-  calendarEvents.value = props.activities.data.map((activity) => ({
+  calendarEvents.value = props.activities.map((activity) => ({
     id: activity.id,
     start: new Date(activity.datetime),
     end: new Date(new Date(activity.datetime).getTime() + 30 * 60000),
@@ -1422,7 +1271,7 @@ const deleteActivity = (id) => {
   if (!confirm('Are you sure you want to delete this activity?')) return;
   router.delete(`/activity/${id}`, {
     onSuccess: () => {
-      localActivities.value = props.activities.data;
+      localActivities.value = props.activities;
       initializeSelectedLocations();
       router.get('/activities', {}, { preserveState: true });
     },
@@ -1494,7 +1343,7 @@ const updateMapMarkers = () => {
           },
           {
             onSuccess: () => {
-              localActivities.value = props.activities.data;
+              localActivities.value = props.activities;
               initializeSelectedLocations();
               updateCalendarEvents();
             },
@@ -1528,12 +1377,6 @@ const initCreateMap = () => {
     return;
   }
 
-  const container = document.getElementById('createMap');
-  if (!container) {
-    console.warn('Create map container not found');
-    return;
-  }
-
   try {
     mapboxgl.accessToken = props.mapboxToken;
     createMap = new mapboxgl.Map({
@@ -1544,12 +1387,24 @@ const initCreateMap = () => {
     });
 
     createMap.on('load', () => {
+      const geocoder = new MapboxGeocoder({
+        accessToken: props.mapboxToken,
+        mapboxgl: mapboxgl,
+      });
+
+      createMap.addControl(geocoder);
+
+      geocoder.on('result', (e) => {
+        const [lng, lat] = e.result.center;
+        createForm.latitude = lat;
+        createForm.longitude = lng;
+        updateCreateMarker(lng, lat);
+      });
+
       createMap.on('click', (e) => {
         createForm.latitude = e.lngLat.lat;
         createForm.longitude = e.lngLat.lng;
         updateCreateMarker(e.lngLat.lng, e.lngLat.lat);
-        addressSuggestions.value = [];
-        searchError.value = '';
       });
     });
   } catch (err) {
@@ -1561,12 +1416,6 @@ const initCreateMap = () => {
 const initManualMap = () => {
   if (!props.mapboxToken) {
     props.errors.global = 'Mapbox token is missing';
-    return;
-  }
-
-  const container = document.getElementById('manualMap');
-  if (!container) {
-    console.warn('Manual map container not found');
     return;
   }
 
@@ -1637,7 +1486,6 @@ watch(selectedMapStyle, (newStyle) => {
     map.setStyle(newStyle);
     map.on('style.load', () => {
       updateMapMarkers();
-      initializeSelectedLocations();
     });
   }
   if (createMap) {
@@ -1650,7 +1498,7 @@ watch(selectedMapStyle, (newStyle) => {
   }
   if (manualMap) {
     manualMap.setStyle(newStyle);
-    manualMap.on('style.load', () => {
+    map.on('style.load', () => {
       if (manualForm.latitude && manualForm.longitude) {
         updateManualMarker(manualForm.longitude, manualForm.latitude);
       }
@@ -1658,7 +1506,7 @@ watch(selectedMapStyle, (newStyle) => {
   }
   if (locationMap) {
     locationMap.setStyle(newStyle);
-    locationMap.on('style.load', () => {
+    map.on('style.load', () => {
       if ((editingLocationId.value && editLocationForm.value.latitude && editLocationForm.value.longitude) ||
           (newLocation.value.latitude && newLocation.value.longitude)) {
         updateLocationMarker(
@@ -1673,7 +1521,7 @@ watch(selectedMapStyle, (newStyle) => {
 onMounted(() => {
   console.log('Props received:', props);
   try {
-    localActivities.value = props.activities.data || [];
+    localActivities.value = props.activities || [];
     initializeSelectedLocations();
     initMap();
     updateCalendarEvents();
@@ -1691,24 +1539,24 @@ watch(localActivities, () => {
 
 watch(showCreateModal, (newVal) => {
   if (newVal) {
-    nextTick(() => initCreateMap());
+    setTimeout(() => initCreateMap(), 0);
   }
 });
 
 watch(showManualModal, (newVal) => {
   if (newVal) {
-    nextTick(() => initManualMap());
+    setTimeout(() => initManualMap(), 0);
   }
 });
 
 watch(dateFilter, () => {
   router.get(
     '/activities',
-    { date: dateFilter.value.toISOString().split('T')[0], per_page: perPage.value },
+    { date: dateFilter.value.toISOString().split('T')[0] },
     {
       preserveState: true,
       onSuccess: () => {
-        localActivities.value = props.activities.data;
+        localActivities.value = props.activities;
         initializeSelectedLocations();
         updateCalendarEvents();
       },

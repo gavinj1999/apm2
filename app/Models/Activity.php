@@ -7,14 +7,17 @@ use Illuminate\Database\Eloquent\Model;
 
 class Activity extends Model
 {
-    use HasFactory;
-
-        protected $fillable = ['datetime', 'latitude', 'longitude', 'activity', 'is_manual'];
-    protected $dates = ['datetime'];
+    protected $fillable = ['datetime', 'latitude', 'longitude', 'activity', 'is_manual'];
 
     protected $casts = [
         'datetime' => 'datetime',
-        'latitude' => 'decimal:8',
-        'longitude' => 'decimal:8',
+        'latitude' => 'float',
+        'longitude' => 'float',
+        'is_manual' => 'boolean',
     ];
+
+    public function activityType()
+    {
+        return $this->belongsTo(ActivityType::class, 'activity', 'name');
+    }
 }
