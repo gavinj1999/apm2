@@ -62,7 +62,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/service-profile/{id}/edit', [ServiceProfileController::class, 'edit'])->name('service-profile.edit');
     Route::put('/service-profile/{id}', [ServiceProfileController::class, 'update'])->name('service-profile.update');
     Route::delete('/service-profile/{id}', [ServiceProfileController::class, 'destroy'])->name('service-profile.destroy');
-    Route::post('/distances/calculate', [DistanceController::class, 'calculate'])->name('distances.calculate');
+    Route::post('/distances/calculate', [ActivityController::class, 'calculateDistances']);
 });
 
 require __DIR__ . '/settings.php';

@@ -14,5 +14,7 @@ class VerifyCsrfToken extends Middleware
     protected $except = [
         '/api/locations',
         '/api/locations/*',
+        'distances/calculate*',
+        'activities*',
     ];
 }

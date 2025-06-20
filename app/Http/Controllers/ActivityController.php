@@ -4,27 +4,26 @@ namespace App\Http\Controllers;
 use App\Models\Activity;
 use App\Models\ActivityType;
 use App\Models\Location;
-use App\Models\Distance;
 use App\Models\ActivityDistance;
-use App\Models\ParcelType;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Http;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class ActivityController extends Controller
 {
     public function index()
     {
         $date = request()->get('date', now()->toDateString());
-        $startOfWeek = Carbon::parse($date)->startOfWeek()->toDateString();
-        $endOfWeek = Carbon::parse($date)->endOfWeek()->toDateString();
-        $perPage = request()->get('per_page', 10);
+        $startOfWeek = Carbon::parse($date)->startOfWeek()->startOfDay();
+        $endOfWeek = Carbon::parse($date)->endOfWeek()->endOfDay();
 
-        $activities = Activity::whereBetween('datetime', [$startOfWeek, $endOfWeek])
-            ->orderBy('datetime')
-            ->paginate($perPage)
-            ->through(function ($activity) {
+        // Fetch all activities to include test data
+        $activities = Activity::orderBy('datetime')
+            ->get()
+            ->map(function ($activity) {
                 return [
                     'id' => $activity->id,
                     'activity' => $activity->activity,
@@ -35,22 +34,43 @@ class ActivityController extends Controller
                 ];
             });
 
-        // Fetch distances for the week
-        $distances = Distance::whereBetween('date', [$startOfWeek, $endOfWeek])
-            ->get()
-            ->groupBy('date')
+        // Fetch all distances, no date filter
+        $distancesQuery = ActivityDistance::query();
+        $distancesRaw = $distancesQuery->get()->toArray();
+        $distances = $distancesQuery->get()
+            ->groupBy(function ($distance) {
+                return Carbon::parse($distance->date)->format('Y-m-d');
+            })
             ->map(function ($group) {
                 return $group->mapWithKeys(function ($distance) {
-                    return [$distance->segment => $distance->distance];
+                    return [$distance->segment => (float) $distance->distance];
                 })->toArray();
             })->toArray();
 
+        // Debug: Log raw SQL and all distances
+        $allDistances = ActivityDistance::all()->toArray();
+        $sqlQuery = $distancesQuery->toSql();
+        $sqlBindings = $distancesQuery->getBindings();
+
+        Log::info('ActivityController::index', [
+            'date' => $date,
+            'startOfWeek' => $startOfWeek->toDateString(),
+            'endOfWeek' => $endOfWeek->toDateString(),
+            'activity_count' => $activities->count(),
+            'activities' => $activities->pluck('id', 'activity')->toArray(),
+            'distances_raw' => $distancesRaw,
+            'distances_formatted' => $distances,
+            'all_distances' => $allDistances,
+            'sql_query' => $sqlQuery,
+            'sql_bindings' => $sqlBindings,
+        ]);
+
         return Inertia::render('Activities/Index', [
             'activities' => $activities,
-            'activityDates' => Activity::pluck('datetime')->map(fn($date) => Carbon::parse($date)->toDateString())->unique()->values(),
+            'activityDates' => Activity::pluck('datetime')->map(fn($d) => Carbon::parse($d)->toDateString())->unique()->values(),
             'activityTypes' => ActivityType::all()->map(fn($type) => [
                 'name' => $type->name,
-                'alias' => $type->alias,
+                'alias' => $type->name,
                 'color' => $type->color,
             ]),
             'locations' => Location::all()->map(fn($location) => [
@@ -61,76 +81,151 @@ class ActivityController extends Controller
             ]),
             'distances' => $distances,
             'mapboxToken' => config('services.mapbox.access_token'),
+            'csrf' => csrf_token(),
         ]);
     }
 
     public function calculateDistances(Request $request)
     {
-        $date = $request->input('date', now()->toDateString());
-        $startOfWeek = Carbon::parse($date)->startOfWeek()->toDateString();
-        $endOfWeek = Carbon::parse($date)->endOfWeek()->toDateString();
+        $activityId = $request->input('activity_id');
+        $date = $request->input('date');
+        $segment = $request->input('segment');
 
-        $activities = Activity::whereBetween('datetime', [$startOfWeek, $endOfWeek])
-            ->orderBy('datetime')
-            ->get()
-            ->groupBy(fn($activity) => Carbon::parse($activity->datetime)->toDateString());
+        Log::info('Calculate distances request:', [
+            'activity_id' => $activityId,
+            'date' => $date,
+            'segment' => $segment,
+        ]);
 
-        $mapboxToken = config('services.mapbox.access_token');
-        $distances = [];
-
-        foreach ($activities as $date => $dailyActivities) {
-            $segments = [
-                'home_to_depot' => ['Left Home', 'Arrive Depot'],
-                'depot_to_first_drop' => ['Leave Depot', 'First Drop'],
-                'last_drop_to_home' => ['Last Drop', 'Arrive Home'],
-            ];
-
-            foreach ($segments as $segment => [$fromActivity, $toActivity]) {
-                // Check if distance already exists
-                if (ActivityDistance::where('date', $date)->where('segment', $segment)->exists()) {
-                    continue;
-                }
-
-                $from = $dailyActivities->firstWhere('activity', $fromActivity);
-                $to = $dailyActivities->firstWhere('activity', $toActivity);
-
-                if (!$from || !$to || !$from->latitude || !$from->longitude || !$to->latitude || !$to->longitude) {
-                    continue; // Skip if activities or coordinates are missing
-                }
-
-                // Call Mapbox Directions API
-                $response = Http::get('https://api.mapbox.com/directions/v5/mapbox/driving/' . 
-                    "{$from->longitude},{$from->latitude};{$to->longitude},{$to->latitude}", [
-                    'access_token' => $mapboxToken,
-                    'geometries' => 'geojson',
-                ]);
-
-                if ($response->failed() || !isset($response->json()['routes'][0]['distance'])) {
-                    continue; // Skip on API error
-                }
-
-                $distance = $response->json()['routes'][0]['distance'] / 1000; // Convert meters to kilometers
-
-                // Store distance
-                ActivityDistance::create([
-                    'date' => $date,
-                    'segment' => $segment,
-                    'distance' => $distance,
-                    'unit' => 'km',
-                    'activity_from_id' => $from->id,
-                    'activity_to_id' => $to->id,
-                ]);
-
-                $distances[] = [
-                    'date' => $date,
-                    'segment' => $segment,
-                    'distance' => $distance,
-                    'unit' => 'km',
-                ];
-            }
+        if (!$activityId || !$segment || !$date) {
+            Log::error('Missing parameters in calculateDistances', [
+                'activity_id' => $activityId,
+                'date' => $date,
+                'segment' => $segment,
+            ]);
+            return response()->json(['error' => 'Missing required parameters: activity_id, segment, date'], 400);
         }
 
-        return response()->json(['distances' => $distances]);
+        if (!in_array($segment, ['home_to_depot', 'depot_to_first_drop', 'last_drop_to_home'])) {
+            Log::error('Invalid segment', ['segment' => $segment]);
+            return response()->json(['error' => 'Invalid segment'], 400);
+        }
+
+        $activity = Activity::find($activityId);
+        if (!$activity) {
+            Log::error('Activity not found', ['activity_id' => $activityId]);
+            return response()->json(['error' => 'Activity not found'], 404);
+        }
+
+        if (
+            ($segment === 'home_to_depot' && $activity->activity !== 'Left Home') ||
+            ($segment === 'depot_to_first_drop' && $activity->activity !== 'Leave Depot') ||
+            ($segment === 'last_drop_to_home' && $activity->activity !== 'Last Drop')
+        ) {
+            Log::error('Activity mismatch', [
+                'activity' => $activity->activity,
+                'segment' => $segment,
+            ]);
+            return response()->json(['error' => "Activity {$activity->activity} does not match segment $segment"], 400);
+        }
+
+        if (ActivityDistance::where('date', $date)->where('segment', $segment)->exists()) {
+            Log::info('Distance already calculated', ['date' => $date, 'segment' => $segment]);
+            $existingDistance = ActivityDistance::where('date', $date)->where('segment', $segment)->first();
+            return response()->json([
+                'message' => 'Distance already calculated',
+                'distance' => (float) $existingDistance->distance,
+                'date' => $date,
+                'segment' => $segment,
+            ], 200);
+        }
+
+        $mapboxToken = config('services.mapbox.access_token');
+        $from = null;
+        $to = null;
+
+        if ($segment === 'home_to_depot') {
+            $from = Location::where('name', 'Home')->first();
+            $to = Location::where('name', 'Depot')->first();
+            $toActivity = Activity::where('activity', 'Arrive Depot')->whereDate('datetime', $date)->first();
+        } elseif ($segment === 'depot_to_first_drop') {
+            $from = Location::where('name', 'Depot')->first();
+            $to = Activity::where('activity', 'First Drop')->whereDate('datetime', $date)->first();
+            $toActivity = $to;
+        } elseif ($segment === 'last_drop_to_home') {
+            $from = Activity::where('activity', 'Last Drop')->whereDate('datetime', $date)->first();
+            $to = Location::where('name', 'Home')->first();
+            $toActivity = Activity::where('activity', 'Arrive Home')->whereDate('datetime', $date)->first();
+        }
+
+        if (!$from || !$to) {
+            Log::error('Locations or activities not found', [
+                'from' => $from ? 'found' : 'missing',
+                'to' => $to ? 'found' : 'missing',
+                'segment' => $segment,
+                'date' => $date,
+            ]);
+            return response()->json(['error' => 'Required locations or activities not found'], 404);
+        }
+
+        $fromLat = $from->latitude;
+        $fromLng = $from->longitude;
+        $toLat = $to->latitude;
+        $toLng = $to->longitude;
+
+        if (!$fromLat || !$fromLng || !$toLat || !$toLng) {
+            Log::error('Invalid coordinates', [
+                'fromLat' => $fromLat,
+                'fromLng' => $fromLng,
+                'toLat' => $toLat,
+                'toLng' => $toLng,
+            ]);
+            return response()->json(['error' => 'Invalid coordinates'], 400);
+        }
+
+        try {
+            $response = Http::withOptions(['verify' => false])->get('https://api.mapbox.com/directions/v5/mapbox/driving/' . 
+                "{$fromLng},{$fromLat};{$toLng},{$toLat}", [
+                'access_token' => $mapboxToken,
+                'geometries' => 'geojson',
+            ]);
+
+            if ($response->failed() || !isset($response->json()['routes'][0]['distance'])) {
+                Log::error('Mapbox API failed:', ['response' => $response->json()]);
+                return response()->json(['error' => 'Failed to calculate distance'], 500);
+            }
+
+            // Convert meters to miles (1 meter = 0.000621371 miles)
+            $distance = $response->json()['routes'][0]['distance'] * 0.000621371;
+
+            $activityDistance = ActivityDistance::create([
+                'date' => $date,
+                'segment' => $segment,
+                'distance' => $distance,
+                'activity_from_id' => $activity->id,
+                'activity_to_id' => $toActivity ? $toActivity->id : null,
+            ]);
+
+            Log::info('Distance calculated and saved:', [
+                'activity_id' => $activityId,
+                'date' => $date,
+                'segment' => $segment,
+                'distance_miles' => $distance,
+                'activity_distance_id' => $activityDistance->id,
+            ]);
+
+            return response()->json([
+                'distance' => (float) $distance,
+                'date' => $date,
+                'segment' => $segment,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Distance calculation exception:', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['error' => 'Failed to calculate distance: ' . $e->getMessage()], 500);
+        }
     }
 
     public function store(Request $request)
@@ -143,13 +238,6 @@ class ActivityController extends Controller
             'is_manual' => 'sometimes|boolean',
         ]);
 
-        // Adjust datetime to account for BST (subtract 1 hour if in BST)
-        $datetime = Carbon::parse($validated['datetime']);
-        if ($datetime->isDST() && $datetime->timezoneName === 'Europe/London') {
-            $datetime->subHour();
-        }
-
-        // Override coordinates for Home/Depot activities
         $latitude = $validated['latitude'];
         $longitude = $validated['longitude'];
         $activityName = $validated['activity'];
@@ -169,7 +257,7 @@ class ActivityController extends Controller
         }
 
         $activity = Activity::create([
-            'datetime' => $datetime,
+            'datetime' => $validated['datetime'],
             'latitude' => $latitude,
             'longitude' => $longitude,
             'activity' => $activityName,
@@ -180,7 +268,7 @@ class ActivityController extends Controller
             return response()->json([
                 'data' => [
                     'id' => $activity->id,
-                    'datetime' => $activity->datetime->toISOString(),
+                    'datetime' => $activity->datetime->toDateTimeString(),
                     'latitude' => (float) $activity->latitude,
                     'longitude' => (float) $activity->longitude,
                     'activity' => $activity->activity,
@@ -203,14 +291,6 @@ class ActivityController extends Controller
             'is_manual' => 'sometimes|boolean',
         ]);
 
-        // Adjust datetime to account for BST (subtract 1 hour if in BST)
-        $datetime = Carbon::parse($validated['datetime']);
-        if ($datetime->isDST() && $datetime->timezoneName === 'Europe/London') {
-            $datetime->subHour();
-        }
-        $validated['datetime'] = $datetime;
-
-        // Override coordinates for Home/Depot activities
         $latitude = $validated['latitude'];
         $longitude = $validated['longitude'];
         $activityName = $validated['activity'];
@@ -238,7 +318,7 @@ class ActivityController extends Controller
             return response()->json([
                 'data' => [
                     'id' => $activity->id,
-                    'datetime' => $activity->datetime->toISOString(),
+                    'datetime' => $activity->datetime->toDateTimeString(),
                     'latitude' => (float) $activity->latitude,
                     'longitude' => (float) $activity->longitude,
                     'activity' => $activity->activity,
@@ -260,21 +340,13 @@ class ActivityController extends Controller
             'is_manual' => 'sometimes|boolean',
         ]);
 
-        if (isset($validated['datetime'])) {
-            $datetime = Carbon::parse($validated['datetime']);
-            if ($datetime->isDST() && $datetime->timezoneName === 'Europe/London') {
-                $datetime->subHour();
-            }
-            $validated['datetime'] = $datetime;
-        }
-
         $activity->update(array_filter($validated));
 
         if ($request->expectsJson()) {
             return response()->json([
                 'data' => [
                     'id' => $activity->id,
-                    'datetime' => $activity->datetime->toISOString(),
+                    'datetime' => $activity->datetime->toDateTimeString(),
                     'latitude' => (float) $activity->latitude,
                     'longitude' => (float) $activity->longitude,
                     'activity' => $activity->activity,
@@ -304,18 +376,15 @@ class ActivityController extends Controller
             'id' => 'required|exists:activities,id',
         ]);
 
-        // Ensure the activity passed matches the ID
         if ($activity->id != $validated['id']) {
             return response()->json(['message' => 'Invalid activity ID'], 400);
         }
 
-        // Find duplicates: same activity type, same date
         $duplicates = Activity::where('id', '!=', $activity->id)
             ->where('activity', $activity->activity)
             ->whereDate('datetime', $activity->datetime->toDateString())
             ->get();
 
-        // Delete duplicates
         foreach ($duplicates as $duplicate) {
             $duplicate->delete();
         }
@@ -324,7 +393,7 @@ class ActivityController extends Controller
             return response()->json([
                 'data' => [
                     'id' => $activity->id,
-                    'datetime' => $activity->datetime->toISOString(),
+                    'datetime' => $activity->datetime->toDateTimeString(),
                     'latitude' => (float) $activity->latitude,
                     'longitude' => (float) $activity->longitude,
                     'activity' => $activity->activity,

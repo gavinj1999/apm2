@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up()
     {
-        Schema::create('distances', function (Blueprint $table) {
+        Schema::create('activity_distances', function (Blueprint $table) {
             $table->id();
             $table->date('date');
             $table->string('segment'); // e.g., 'home_to_depot', 'leave_depot_to_first_drop', 'last_drop_to_home'
