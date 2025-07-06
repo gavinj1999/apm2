@@ -1,114 +1,100 @@
+<!-- resources/js/components/Activity/ActivityFormModal.vue -->
 <template>
-  <div class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
-    <div class="bg-gray-800 rounded-lg p-6 w-full" :class="{ 'max-w-md': mode === 'edit', 'max-w-3xl': mode !== 'edit' }">
-      <h3 class="text-lg font-medium text-white mb-4">
-        {{ mode === 'edit' ? 'Edit Activity' : mode === 'manual' ? `Add ${getAlias(form.activity)} for ${formatDate(date, 'date')}` : 'Add New Activity' }}
-      </h3>
+  <div class="fixed top-1/4 left-1/2 transform -translate-x-1/2 w-full max-w-md z-50">
+    <div class="bg-gray-800 bg-opacity-90 rounded-lg shadow-lg p-6">
+      <h2 class="text-lg font-semibold text-white mb-4">
+        {{ mode === 'edit' ? 'Edit Activity' : mode === 'start-loading' ? 'Add Start Loading' : 'Add Activity' }}
+      </h2>
       <form @submit.prevent="submitForm">
         <div class="mb-4">
-          <label for="datetime" class="block text-sm font-medium text-gray-300">Date & Time</label>
-          <input
-            type="datetime-local"
-            id="datetime"
-            v-model="form.datetime"
-            class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            required
-          />
-          <div v-if="errors.datetime" class="text-red-400 text-sm mt-1">{{ errors.datetime }}</div>
-        </div>
-        <div v-if="!isFixedLocationActivity(form.activity)">
-          <!-- Map Search -->
-          <div class="mb-4 relative">
-            <label for="mapSearch" class="block text-sm font-medium text-gray-300">Search Location</label>
-            <input
-              type="text"
-              id="mapSearch"
-              v-model="searchQuery"
-              @input="debounceSearch"
-              placeholder="Enter city or address"
-              class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            />
-            <div v-if="searchError" class="text-red-400 text-sm mt-1">{{ searchError }}</div>
-            <ul
-              v-if="addressSuggestions.length"
-              class="absolute z-10 w-full bg-gray-700 border border-gray-600 rounded-md mt-1 max-h-48 overflow-y-auto"
-            >
-              <li
-                v-for="suggestion in addressSuggestions"
-                :key="suggestion.id"
-                @click="selectAddress(suggestion)"
-                class="px-4 py-2 text-white text-sm hover:bg-gray-600 cursor-pointer"
-              >
-                {{ suggestion.place_name }}
-              </li>
-            </ul>
-          </div>
-          <!-- Map -->
-          <div v-if="mapboxToken" class="mb-4 h-96">
-            <div :id="mapId" class="w-full h-full rounded-md"></div>
-          </div>
-          <div v-else class="text-yellow-400 mb-4">Mapbox token is missing</div>
-          <div class="mb-4">
-            <label for="latitude" class="block text-sm font-medium text-gray-300">Latitude</label>
-            <input
-              type="number"
-              id="latitude"
-              v-model="form.latitude"
-              step="any"
-              min="-90"
-              max="90"
-              class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-              required
-            />
-            <div v-if="errors.latitude" class="text-red-400 text-sm mt-1">{{ errors.latitude }}</div>
-          </div>
-          <div class="mb-4">
-            <label for="longitude" class="block text-sm font-medium text-gray-300">Longitude</label>
-            <input
-              type="number"
-              id="longitude"
-              v-model="form.longitude"
-              step="any"
-              min="-180"
-              max="180"
-              class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-              required
-            />
-            <div v-if="errors.longitude" class="text-red-400 text-sm mt-1">{{ errors.longitude }}</div>
-          </div>
-        </div>
-        <div v-else class="mb-4">
-          <p class="text-gray-300 text-sm">Location will be set to {{ getFixedLocationName(form.activity) }}</p>
-          <div v-if="locationError" class="text-red-400 text-sm mt-1">{{ locationError }}</div>
-        </div>
-        <div class="mb-4">
-          <label for="activity" class="block text-sm font-medium text-gray-300">Activity</label>
+          <label for="activity" class="block text-sm font-medium text-gray-300">Activity Type</label>
           <select
-            id="activity"
             v-model="form.activity"
-            class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            id="activity"
+            class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500"
             required
-            :disabled="mode === 'manual'"
+            :disabled="mode === 'start-loading' || (mode === 'manual' && form.activity)"
           >
+            <option value="" disabled>Select an activity</option>
             <option v-for="type in activityTypes" :key="type.name" :value="type.name">{{ type.name }}</option>
           </select>
-          <div v-if="errors.activity" class="text-red-400 text-sm mt-1">{{ errors.activity }}</div>
         </div>
-        <div class="flex justify-end">
+        <div class="mb-4">
+          <label for="datetime" class="block text-sm font-medium text-gray-300">Date and Time</label>
+          <input
+            v-model="form.datetime"
+            type="datetime-local"
+            id="datetime"
+            class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500"
+            required
+            :disabled="mode === 'start-loading'"
+          />
+        </div>
+        <div class="mb-4" v-if="mode === 'start-loading'">
+          <label for="rounds" class="block text-sm font-medium text-gray-300">Number of Rounds</label>
+          <select
+            v-model.number="form.rounds"
+            id="rounds"
+            class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500"
+            required
+          >
+            <option :value="1">1</option>
+            <option :value="2">2</option>
+            <option :value="3">3</option>
+            <option :value="4">4</option>
+            <option :value="5">5</option>
+          </select>
+        </div>
+        <div class="mb-4">
+          <label for="latitude" class="block text-sm font-medium text-gray-300">Latitude</label>
+          <input
+            v-model.number="form.latitude"
+            type="number"
+            id="latitude"
+            step="any"
+            class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500"
+            required
+            :disabled="isFixedLocation"
+          />
+        </div>
+        <div class="mb-4">
+          <label for="longitude" class="block text-sm font-medium text-gray-300">Longitude</label>
+          <input
+            v-model.number="form.longitude"
+            type="number"
+            id="longitude"
+            step="any"
+            class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500"
+            required
+            :disabled="isFixedLocation"
+          />
+        </div>
+        <div class="mb-4" v-if="mode !== 'edit'">
+          <label for="is_manual" class="flex items-center">
+            <input
+              v-model="form.is_manual"
+              type="checkbox"
+              id="is_manual"
+              class="rounded border-gray-600 text-indigo-500 focus:ring-indigo-500"
+              :disabled="mode === 'start-loading' || mode === 'manual'"
+            />
+            <span class="ml-2 text-sm text-gray-300">Manual Entry</span>
+          </label>
+        </div>
+        <div v-if="error" class="text-red-400 text-sm mb-4">{{ error }}</div>
+        <div class="flex justify-end space-x-2">
           <button
             type="button"
-            @click="$emit('close')"
-            class="mr-4 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500 text-sm"
+            @click="close"
+            class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500"
           >
             Cancel
           </button>
           <button
             type="submit"
+            class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500"
             :disabled="isSubmitting"
-            class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 flex items-center text-sm"
-            :class="{ 'opacity-50 cursor-not-allowed': isSubmitting }"
           >
-            <span v-if="isSubmitting" class="inline-block w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
             {{ isSubmitting ? 'Saving...' : 'Save' }}
           </button>
         </div>
@@ -118,218 +104,122 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick } from 'vue';
-import mapboxgl from 'mapbox-gl';
-import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder';
+import { ref, computed, watch } from 'vue';
 import axios from 'axios';
-import { debounce } from 'lodash';
 
 const props = defineProps({
-  mode: {
-    type: String,
-    required: true,
-    validator: (value) => ['create', 'edit', 'manual'].includes(value),
-  },
-  activity: Object,
-  activityTypes: Array,
-  locations: Array,
-  mapboxToken: String,
-  date: String,
+  mode: { type: String, required: true },
+  activity: { type: Object, default: () => ({}) },
+  activityTypes: { type: Array, default: () => [] },
+  locations: { type: Array, default: () => [] },
+  mapboxToken: { type: String, default: '' },
+  date: { type: String, default: '' },
+  rounds: { type: Number, default: 1 },
 });
 
 const emit = defineEmits(['submit', 'close']);
 
 const form = ref({
-  id: null,
-  datetime: '',
-  latitude: '',
-  longitude: '',
-  activity: '',
-  is_manual: props.mode === 'manual',
+  id: props.activity.id || null,
+  activity: props.activity.activity || '',
+  datetime: props.activity.datetime || (props.date ? `${props.date}T00:00:00` : new Date().toISOString().slice(0, 16)),
+  latitude: props.activity.latitude || null,
+  longitude: props.activity.longitude || null,
+  is_manual: props.activity.is_manual || false,
+  rounds: props.rounds || 1,
 });
-const searchQuery = ref('');
-const addressSuggestions = ref([]);
-const searchError = ref('');
-const locationError = ref('');
+
+const error = ref('');
 const isSubmitting = ref(false);
-const errors = ref({});
-let map = null;
-let marker = null;
 
-const mapId = computed(() => props.mode === 'create' ? 'createMap' : 'manualMap');
+const isFixedLocation = computed(() => {
+  return ['Left Home', 'Arrive Depot', 'Start Loading', 'Leave Depot', 'Arrive Home'].includes(form.value.activity);
+});
 
-const getAlias = (activityName) => {
-  const type = props.activityTypes.find((t) => t.name === activityName);
-  return type ? type.alias : activityName;
-};
-
-const isFixedLocationActivity = (activityName) => {
-  return ['Left Home', 'Arrive Depot', 'Start Loading', 'Leave Depot', 'Arrive Home'].includes(activityName);
-};
-
-const getFixedLocationName = (activityName) => {
-  if (['Left Home', 'Arrive Home'].includes(activityName)) return 'Home';
-  if (['Arrive Depot', 'Start Loading', 'Leave Depot'].includes(activityName)) return 'Depot';
-  return '';
-};
-
-const formatDate = (dateString, type) => {
-  if (!dateString) return '-';
-  const date = new Date(dateString);
-  const options = {
-    timeZone: 'Europe/London',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  };
-  if (type === 'date') {
-    return date.toLocaleDateString('en-GB', options);
-  }
-  return date.toLocaleString('en-GB', options);
-};
-
-onMounted(() => {
-  if (props.activity) {
-    form.value = {
-      id: props.activity.id || null,
-      datetime: props.activity.datetime ? new Date(props.activity.datetime).toISOString().slice(0, 16) : (props.date ? `${props.date}T07:00` : new Date().toISOString().slice(0, 16)),
-      latitude: props.activity.latitude || '',
-      longitude: props.activity.longitude || '',
-      activity: props.activity.activity || '',
-      is_manual: props.mode === 'manual' || props.activity.is_manual || false,
-    };
+watch(() => [form.value.activity, form.value.rounds], async ([newActivity, newRounds]) => {
+  console.log('Activity or rounds changed:', { activity: newActivity, rounds: newRounds });
+  if (newActivity === 'Start Loading' && props.mode === 'start-loading') {
+    const leaveDepot = await fetchLeaveDepotTime(props.date);
+    if (!leaveDepot) {
+      error.value = `No Leave Depot activity found for ${props.date}`;
+      form.value.datetime = '';
+      return;
+    }
+    const depot = props.locations.find(loc => loc.name === 'Depot');
+    if (!depot) {
+      error.value = 'Depot location not found';
+      console.error('Depot location not found');
+      return;
+    }
+    form.value.latitude = Number(depot.latitude);
+    form.value.longitude = Number(depot.longitude);
+    const leaveTime = new Date(leaveDepot.datetime);
+    const minutesToSubtract = newRounds * 20;
+    const startLoadingTime = new Date(leaveTime.getTime() - minutesToSubtract * 60 * 1000);
+    form.value.datetime = startLoadingTime.toISOString().slice(0, 16);
+    form.value.is_manual = true;
+  } else if (isFixedLocation.value) {
+    const locationName = newActivity.includes('Home') ? 'Home' : 'Depot';
+    const location = props.locations.find(loc => loc.name === locationName);
+    if (location) {
+      form.value.latitude = Number(location.latitude);
+      form.value.longitude = Number(location.longitude);
+      console.log('Set fixed location coordinates:', { latitude: form.value.latitude, longitude: form.value.longitude });
+    } else {
+      error.value = `${locationName} location not found`;
+      console.error('Location not found:', locationName);
+    }
   } else {
-    form.value.datetime = new Date().toISOString().slice(0, 16);
-  }
-  if (!isFixedLocationActivity(form.value.activity)) {
-    nextTick(() => initMap());
+    form.value.latitude = null;
+    form.value.longitude = null;
   }
 });
 
-const debounceSearch = debounce(async () => {
-  if (!props.mapboxToken) {
-    searchError.value = 'Mapbox token is missing';
-    addressSuggestions.value = [];
-    return;
-  }
-
-  if (!searchQuery.value.trim()) {
-    addressSuggestions.value = [];
-    searchError.value = '';
-    return;
-  }
-
+const fetchLeaveDepotTime = async (date) => {
   try {
-    console.log('Searching for:', searchQuery.value);
-    const response = await axios.get('https://api.mapbox.com/geocoding/v5/mapbox.places/' + encodeURIComponent(searchQuery.value) + '.json', {
-      params: {
-        access_token: props.mapboxToken,
-        proximity: '-2.490,53.074',
-        country: 'GB',
-        autocomplete: true,
-        limit: 5,
-      },
+    const response = await axios.get('/activities', {
+      params: { date },
     });
-    addressSuggestions.value = response.data.features;
-    searchError.value = '';
-  } catch (error) {
-    console.error('Error fetching address suggestions:', error);
-    if (error.response) {
-      searchError.value = `Search failed: ${error.response.status} ${error.response.statusText}`;
-    } else {
-      searchError.value = 'Search failed: Unable to connect to Mapbox API';
-    }
-    addressSuggestions.value = [];
-  }
-}, 300);
-
-const selectAddress = (suggestion) => {
-  const [lng, lat] = suggestion.center;
-  form.value.latitude = lat;
-  form.value.longitude = lng;
-  updateMarker(lng, lat);
-  addressSuggestions.value = [];
-  searchQuery.value = suggestion.place_name;
-  searchError.value = '';
-};
-
-const initMap = () => {
-  if (!props.mapboxToken) {
-    searchError.value = 'Mapbox token is missing';
-    return;
-  }
-
-  const container = document.getElementById(mapId.value);
-  if (!container) {
-    console.warn(`${mapId.value} container not found`);
-    return;
-  }
-
-  try {
-    mapboxgl.accessToken = props.mapboxToken;
-    map = new mapboxgl.Map({
-      container: mapId.value,
-      style: 'mapbox://styles/mapbox/dark-v11',
-      center: [-2.490, 53.074],
-      zoom: 10,
-    });
-
-    map.on('load', () => {
-      const geocoder = new MapboxGeocoder({
-        accessToken: props.mapboxToken,
-        mapboxgl: mapboxgl,
-      });
-
-      map.addControl(geocoder);
-
-      geocoder.on('result', (e) => {
-        const [lng, lat] = e.result.center;
-        form.value.latitude = lat;
-        form.value.longitude = lng;
-        updateMarker(lng, lat);
-      });
-
-      map.on('click', (e) => {
-        form.value.latitude = e.lngLat.lat;
-        form.value.longitude = e.lngLat.lng;
-        updateMarker(e.lngLat.lng, e.lngLat.lat);
-      });
+    const activities = response.data.activities || [];
+    return activities.find(a => {
+      const activityDate = new Date(a.datetime).toISOString().split('T')[0];
+      return activityDate === date && a.activity === 'Leave Depot';
     });
   } catch (err) {
-    searchError.value = `Map initialization failed: ${err.message}`;
-    console.error(err);
+    console.error('Error fetching Leave Depot:', err);
+    return null;
   }
-};
-
-const updateMarker = (lng, lat) => {
-  if (marker) marker.remove();
-  const el = document.createElement('div');
-  el.className = 'marker';
-  el.style.backgroundColor = '#4f46e5';
-  el.style.width = '12px';
-  el.style.height = '12px';
-  el.style.borderRadius = '50%';
-  el.style.border = '2px solid white';
-
-  marker = new mapboxgl.Marker(el).setLngLat([lng, lat]).addTo(map);
 };
 
 const submitForm = () => {
+  console.log('Submitting form:', form.value);
+  error.value = '';
   isSubmitting.value = true;
-  errors.value = {};
-  emit('submit', { mode: props.mode, data: form.value });
+
+  if (!form.value.activity || !form.value.datetime || form.value.latitude === null || form.value.longitude === null) {
+    error.value = 'Please fill in all required fields.';
+    isSubmitting.value = false;
+    console.error('Form validation failed:', form.value);
+    return;
+  }
+
+  emit('submit', {
+    mode: props.mode,
+    data: {
+      id: form.value.id,
+      activity: form.value.activity,
+      datetime: form.value.datetime,
+      latitude: Number(form.value.latitude),
+      longitude: Number(form.value.longitude),
+      is_manual: form.value.is_manual,
+    },
+  });
+
   isSubmitting.value = false;
 };
 
-watch(() => form.activity, () => {
-  if (!isFixedLocationActivity(form.activity)) {
-    nextTick(() => initMap());
-  }
-});
+const close = () => {
+  console.log('Emitting close event');
+  emit('close');
+};
 </script>
-
-<style>
-#createMap, #manualMap {
-  height: 100%;
-}
-</style>

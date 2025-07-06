@@ -5,7 +5,6 @@ const props = defineProps<{
     currentPeriod: string;
     currentPeriodEarnings: number;
     averageDailyIncome: number;
-    remainingDays: number;
     flattenedRows: Array<{
         date: string;
         manifest: {
@@ -42,6 +41,48 @@ function formatDate(dateStr: string): string {
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
 }
+
+// Period ranges mapping
+const periodRanges: { [key: string]: { startDate: string; endDate: string } } = {
+    'P 5': { startDate: '2025-06-28', endDate: '2025-08-01' },
+    // Add other periods as needed, e.g.:
+    // 'P 1': { startDate: '2025-01-01', endDate: '2025-01-15' },
+    // 'P 2': { startDate: '2025-01-16', endDate: '2025-01-31' },
+};
+
+// Helper function to get period start/end dates
+function getPeriodDates(period: string): { startDate: Date; endDate: Date } {
+    const range = periodRanges[period];
+    if (range) {
+        return {
+            startDate: new Date(range.startDate),
+            endDate: new Date(range.endDate),
+        };
+    }
+    // Fallback: Return current month if period is unknown
+    console.warn(`Unknown period: ${period}, falling back to current month`);
+    const now = new Date();
+    return {
+        startDate: new Date(now.getFullYear(), now.getMonth(), 1),
+        endDate: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+    };
+}
+
+// Compute remaining days in the current period
+const remainingDays = computed(() => {
+    const { endDate } = getPeriodDates(props.currentPeriod);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to start of day
+    endDate.setHours(0, 0, 0, 0); // Normalize to start of day
+
+    // If today is after the period's end, return 0
+    if (today > endDate) return 0;
+
+    // Calculate days remaining (including today)
+    const timeDiff = endDate.getTime() - today.getTime();
+    const daysRemaining = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+    return daysRemaining;
+});
 
 // Compute total holiday payments
 const totalHolidayPayments = computed(() => {
@@ -162,7 +203,6 @@ function handleDownloadCsv() {
                 </div>
                 <!-- Download CSV Card -->
                 <div class="bg-gray-700 rounded-lg shadow-md overflow-hidden">
-
                     <div class="p-4 flex justify-center items-center">
                         <button @click="handleDownloadCsv"
                             class="bg-blue-600 hover:bg-blue-700 text-white text-md font-semibold px-4 py-2 rounded-md transition duration-200 w-full">

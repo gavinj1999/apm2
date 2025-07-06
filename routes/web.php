@@ -13,6 +13,7 @@ use App\Http\Controllers\NMWCalculatorController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\ParcelTypeController;
 use App\Http\Controllers\ServiceProfileController;
+use App\Http\Controllers\SettingController;
 use App\Http\Controllers\DistanceController;
 use Inertia\Inertia;
 
@@ -63,6 +64,9 @@ Route::middleware('auth')->group(function () {
     Route::put('/service-profile/{id}', [ServiceProfileController::class, 'update'])->name('service-profile.update');
     Route::delete('/service-profile/{id}', [ServiceProfileController::class, 'destroy'])->name('service-profile.destroy');
     Route::post('/distances/calculate', [ActivityController::class, 'calculateDistances']);
+
+    Route::get('/settings', [SettingController::class, 'index'])->name('settings');
+    Route::post('/settings', [SettingController::class, 'update']);
 });
 
 require __DIR__ . '/settings.php';

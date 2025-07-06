@@ -5,6 +5,7 @@ use App\Models\Activity;
 use App\Models\ActivityType;
 use App\Models\Location;
 use App\Models\ActivityDistance;
+use App\Models\DeliverySetting;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -34,7 +35,7 @@ class ActivityController extends Controller
                 ];
             });
 
-        // Fetch all distances, no date filter
+        // Fetch all distances
         $distancesQuery = ActivityDistance::query();
         $distancesRaw = $distancesQuery->get()->toArray();
         $distances = $distancesQuery->get()
@@ -46,6 +47,9 @@ class ActivityController extends Controller
                     return [$distance->segment => (float) $distance->distance];
                 })->toArray();
             })->toArray();
+
+        // Fetch delivery settings
+        $settings = DeliverySetting::all()->pluck('value', 'key')->toArray();
 
         // Debug: Log raw SQL and all distances
         $allDistances = ActivityDistance::all()->toArray();
@@ -63,7 +67,11 @@ class ActivityController extends Controller
             'all_distances' => $allDistances,
             'sql_query' => $sqlQuery,
             'sql_bindings' => $sqlBindings,
+            'settings' => $settings,
         ]);
+
+        // Clean up duplicates for 'Start Loading' on 2025-06-26
+        $this->cleanDuplicateStartLoading('2025-06-26');
 
         return Inertia::render('Activities/Index', [
             'activities' => $activities,
@@ -80,9 +88,30 @@ class ActivityController extends Controller
                 'longitude' => $location->longitude,
             ]),
             'distances' => $distances,
+            'settings' => $settings,
             'mapboxToken' => config('services.mapbox.access_token'),
             'csrf' => csrf_token(),
         ]);
+    }
+
+    protected function cleanDuplicateStartLoading($date)
+    {
+        $startLoadingActivities = Activity::where('activity', 'Start Loading')
+            ->whereDate('datetime', $date)
+            ->orderBy('datetime')
+            ->get();
+
+        if ($startLoadingActivities->count() > 1) {
+            // Keep the earliest Start Loading, delete the rest
+            $earliest = $startLoadingActivities->first();
+            $startLoadingActivities->slice(1)->each(function ($activity) {
+                $activity->delete();
+                Log::info('Deleted duplicate Start Loading activity:', [
+                    'id' => $activity->id,
+                    'datetime' => $activity->datetime->toDateTimeString(),
+                ]);
+            });
+        }
     }
 
     public function calculateDistances(Request $request)
@@ -90,25 +119,114 @@ class ActivityController extends Controller
         $activityId = $request->input('activity_id');
         $date = $request->input('date');
         $segment = $request->input('segment');
+        $useEstimate = $request->input('use_estimate', false);
 
         Log::info('Calculate distances request:', [
             'activity_id' => $activityId,
             'date' => $date,
             'segment' => $segment,
+            'use_estimate' => $useEstimate,
         ]);
 
-        if (!$activityId || !$segment || !$date) {
+        if (!$segment || !$date) {
             Log::error('Missing parameters in calculateDistances', [
                 'activity_id' => $activityId,
                 'date' => $date,
                 'segment' => $segment,
             ]);
-            return response()->json(['error' => 'Missing required parameters: activity_id, segment, date'], 400);
+            return response()->json(['error' => 'Missing required parameters: segment, date'], 400);
         }
 
         if (!in_array($segment, ['home_to_depot', 'depot_to_first_drop', 'last_drop_to_home'])) {
             Log::error('Invalid segment', ['segment' => $segment]);
             return response()->json(['error' => 'Invalid segment'], 400);
+        }
+
+        if (ActivityDistance::where('date', $date)->where('segment', $segment)->exists()) {
+            Log::info('Distance already calculated', ['date' => $date, 'segment' => $segment]);
+            $existingDistance = ActivityDistance::where('date', $date)->where('segment', $segment)->first();
+            return response()->json([
+                'message' => 'Distance already calculated',
+                'distance' => (float) $existingDistance->distance,
+                'date' => $date,
+                'segment' => $segment,
+            ], 200);
+        }
+
+        $mapboxToken = config('services.mapbox.access_token');
+        $settings = DeliverySetting::all()->pluck('value', 'key')->toArray();
+
+        if ($useEstimate) {
+            if ($segment === 'home_to_depot' && isset($settings['home_to_depot_distance'])) {
+                $distance = $settings['home_to_depot_distance'];
+                $activityDistance = ActivityDistance::create([
+                    'date' => $date,
+                    'segment' => $segment,
+                    'distance' => $distance,
+                    'activity_from_id' => null,
+                    'activity_to_id' => null,
+                ]);
+
+                Log::info('Estimated distance used:', [
+                    'date' => $date,
+                    'segment' => $segment,
+                    'distance_miles' => $distance,
+                    'activity_distance_id' => $activityDistance->id,
+                ]);
+
+                return response()->json([
+                    'distance' => (float) $distance,
+                    'date' => $date,
+                    'segment' => $segment,
+                ]);
+            } elseif ($segment === 'depot_to_first_drop' && isset($settings['first_drop_distance'])) {
+                $distance = $settings['first_drop_distance'];
+                $activityDistance = ActivityDistance::create([
+                    'date' => $date,
+                    'segment' => $segment,
+                    'distance' => $distance,
+                    'activity_from_id' => null,
+                    'activity_to_id' => null,
+                ]);
+
+                Log::info('Estimated distance used:', [
+                    'date' => $date,
+                    'segment' => $segment,
+                    'distance_miles' => $distance,
+                    'activity_distance_id' => $activityDistance->id,
+                ]);
+
+                return response()->json([
+                    'distance' => (float) $distance,
+                    'date' => $date,
+                    'segment' => $segment,
+                ]);
+            } elseif ($segment === 'last_drop_to_home' && isset($settings['last_drop_distance'])) {
+                $distance = $settings['last_drop_distance'];
+                $activityDistance = ActivityDistance::create([
+                    'date' => $date,
+                    'segment' => $segment,
+                    'distance' => $distance,
+                    'activity_from_id' => null,
+                    'activity_to_id' => null,
+                ]);
+
+                Log::info('Estimated distance used:', [
+                    'date' => $date,
+                    'segment' => $segment,
+                    'distance_miles' => $distance,
+                    'activity_distance_id' => $activityDistance->id,
+                ]);
+
+                return response()->json([
+                    'distance' => (float) $distance,
+                    'date' => $date,
+                    'segment' => $segment,
+                ]);
+            } else {
+                Log::error('No estimated distance available', ['segment' => $segment]);
+                return response()->json(['error' => 'No estimated distance available for this segment'], 400);
+            }
         }
 
         $activity = Activity::find($activityId);
@@ -129,18 +247,6 @@ class ActivityController extends Controller
             return response()->json(['error' => "Activity {$activity->activity} does not match segment $segment"], 400);
         }
 
-        if (ActivityDistance::where('date', $date)->where('segment', $segment)->exists()) {
-            Log::info('Distance already calculated', ['date' => $date, 'segment' => $segment]);
-            $existingDistance = ActivityDistance::where('date', $date)->where('segment', $segment)->first();
-            return response()->json([
-                'message' => 'Distance already calculated',
-                'distance' => (float) $existingDistance->distance,
-                'date' => $date,
-                'segment' => $segment,
-            ], 200);
-        }
-
-        $mapboxToken = config('services.mapbox.access_token');
         $from = null;
         $to = null;
 

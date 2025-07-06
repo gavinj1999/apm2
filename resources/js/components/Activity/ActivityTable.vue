@@ -1,3 +1,4 @@
+<!-- resources/js/components/Activity/ActivityTable.vue -->
 <template>
   <table class="min-w-full divide-y divide-gray-700">
     <thead class="bg-gray-900">
@@ -35,30 +36,30 @@
           <td class="px-6 py-2 flex items-center space-x-2">
             <button
               v-if="!localDistances[normalizeDate(date)]?.home_to_depot"
-              @click="$emit('calculate-distance', { date, segment: 'home_to_depot' })"
+              @click="$emit('calculate-distance', { date, segment: 'home_to_depot', useEstimate: !hasActivity(date, 'Left Home') })"
               :disabled="isCalculatingDistance[`${date}-home_to_depot`]"
               class="text-blue-400 hover:text-blue-300 text-sm flex items-center"
             >
               <span v-if="isCalculatingDistance[`${date}-home_to_depot`]" class="inline-block w-3 h-3 mr-1 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              Home to Depot
+              {{ hasActivity(date, 'Left Home') ? 'Home to Depot' : 'Estimate Home to Depot' }}
             </button>
             <button
               v-if="!localDistances[normalizeDate(date)]?.depot_to_first_drop"
-              @click="$emit('calculate-distance', { date, segment: 'depot_to_first_drop' })"
+              @click="$emit('calculate-distance', { date, segment: 'depot_to_first_drop', useEstimate: !hasActivity(date, 'Leave Depot') || !hasActivity(date, 'First Drop') })"
               :disabled="isCalculatingDistance[`${date}-depot_to_first_drop`]"
               class="text-blue-400 hover:text-blue-300 text-sm flex items-center"
             >
               <span v-if="isCalculatingDistance[`${date}-depot_to_first_drop`]" class="inline-block w-3 h-3 mr-1 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              Depot to First
+              {{ hasActivity(date, 'Leave Depot') && hasActivity(date, 'First Drop') ? 'Depot to First' : 'Estimate Depot to First' }}
             </button>
             <button
               v-if="!localDistances[normalizeDate(date)]?.last_drop_to_home"
-              @click="$emit('calculate-distance', { date, segment: 'last_drop_to_home' })"
+              @click="$emit('calculate-distance', { date, segment: 'last_drop_to_home', useEstimate: !hasActivity(date, 'Last Drop') || !hasActivity(date, 'Arrive Home') })"
               :disabled="isCalculatingDistance[`${date}-last_drop_to_home`]"
               class="text-blue-400 hover:text-blue-300 text-sm flex items-center"
             >
               <span v-if="isCalculatingDistance[`${date}-last_drop_to_home`]" class="inline-block w-3 h-3 mr-1 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              Last to Home
+              {{ hasActivity(date, 'Last Drop') && hasActivity(date, 'Arrive Home') ? 'Last to Home' : 'Estimate Last to Home' }}
             </button>
             <button
               @click="$emit('add-manual', { date })"
@@ -66,9 +67,23 @@
             >
               Add Activity
             </button>
+            <button
+              v-if="!hasStartLoading(date) && hasLeaveDepot(date)"
+              @click="$emit('add-start-loading', { date, rounds: estimateRounds(date) })"
+              class="text-yellow-400 hover:text-yellow-300 text-sm flex items-center"
+            >
+              Add Start Loading
+            </button>
+            <button
+              v-if="!hasActivity(date, 'Left Home')"
+              @click="$emit('add-manual', { date, activity: 'Left Home' })"
+              class="text-green-400 hover:text-green-300 text-sm"
+            >
+              Add Left Home
+            </button>
           </td>
         </tr>
-        <tr v-if="isExpanded[date]" v-for="activity in group" :key="activity.id || activity.activity" class="bg-gray-800">
+        <tr v-if="isExpanded[date]" v-for="activity in sortedActivities(group)" :key="activity.id || activity.activity" class="bg-gray-800">
           <td class="px-6 py-4 whitespace-nowrap text-white text-sm">{{ activity.id || '-' }}</td>
           <td class="px-6 py-4 whitespace-nowrap text-white text-sm">{{ activity.datetime ? formatDate(activity.datetime, 'time') : '-' }}</td>
           <td class="px-6 py-4 whitespace-nowrap text-white text-sm">{{ activity.latitude || '-' }}</td>
@@ -107,10 +122,12 @@ import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/vue/24/solid';
 const props = defineProps({
   activities: { type: Array, default: () => [] },
   distances: { type: Object, default: () => ({}) },
+  settings: { type: Object, default: () => ({}) },
   isCalculatingDistance: { type: Object, default: () => ({}) },
+  locations: { type: Array, default: () => [] },
 });
 
-const emit = defineEmits(['edit-activity', 'delete-activity', 'calculate-distance', 'add-manual']);
+const emit = defineEmits(['edit-activity', 'delete-activity', 'calculate-distance', 'add-manual', 'add-start-loading']);
 
 const isExpanded = ref({});
 const localDistances = computed(() => {
@@ -120,7 +137,7 @@ const localDistances = computed(() => {
 
 // Normalize date keys to Y-m-d
 const normalizeDate = (date) => {
-  return date.split(' ')[0]; // Strips timestamp (e.g., '2025-06-09 00:00:00' → '2025-06-09')
+  return date.split(' ')[0];
 };
 
 // Calculate total distance for a date
@@ -133,6 +150,28 @@ const calculateTotalDistance = (date) => {
     distances.last_drop_to_home || 0,
   ].reduce((sum, val) => sum + Number(val), 0);
   return total > 0 ? total.toFixed(2) : '-';
+};
+
+// Check if Start Loading exists for a date
+const hasStartLoading = (date) => {
+  return groupedActivities.value[date]?.some(a => a.activity === 'Start Loading') || false;
+};
+
+// Check if Leave Depot exists for a date
+const hasLeaveDepot = (date) => {
+  return groupedActivities.value[date]?.some(a => a.activity === 'Leave Depot') || false;
+};
+
+// Check if specific activity exists for a date
+const hasActivity = (date, activityType) => {
+  return groupedActivities.value[date]?.some(a => a.activity === activityType) || false;
+};
+
+// Estimate rounds based on First Drop activities
+const estimateRounds = (date) => {
+  const activities = groupedActivities.value[date] || [];
+  const firstDrops = activities.filter(a => a.activity === 'First Drop').length;
+  return firstDrops > 0 ? firstDrops : 1;
 };
 
 // Format date with local timezone (BST)
@@ -154,6 +193,29 @@ const formatDate = (dateString, type) => {
     return date.toLocaleTimeString('en-GB', { ...options, hour: '2-digit', minute: '2-digit' });
   }
   return date.toLocaleString('en-GB', options);
+};
+
+// Define activity order
+const activityOrder = [
+  'Left Home',
+  'Arrive Depot',
+  'Start Loading',
+  'Leave Depot',
+  'First Drop',
+  'Last Drop',
+  'Arrive Home'
+];
+
+// Sort activities by predefined order and datetime
+const sortedActivities = (activities) => {
+  return [...(activities || [])].sort((a, b) => {
+    const indexA = activityOrder.indexOf(a.activity);
+    const indexB = activityOrder.indexOf(b.activity);
+    if (indexA === indexB) {
+      return new Date(a.datetime) - new Date(b.datetime);
+    }
+    return indexA - indexB;
+  });
 };
 
 // Group activities by date
@@ -185,6 +247,7 @@ onMounted(() => {
     activities: props.activities.length,
     activityIds: props.activities.map(a => a.id),
     distances: JSON.parse(JSON.stringify(props.distances)),
+    settings: JSON.parse(JSON.stringify(props.settings)),
     groupedDays: Object.keys(groupedActivities.value),
   });
 });
