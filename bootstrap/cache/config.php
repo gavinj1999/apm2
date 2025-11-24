@@ -1,12 +1,94 @@
 <?php return array (
-  2 => 'broadcasting',
-  4 => 'concurrency',
-  8 => 'hashing',
-  14 => 'view',
+  'broadcasting' => 
+  array (
+    'default' => 'log',
+    'connections' => 
+    array (
+      'reverb' => 
+      array (
+        'driver' => 'reverb',
+        'key' => NULL,
+        'secret' => NULL,
+        'app_id' => NULL,
+        'options' => 
+        array (
+          'host' => NULL,
+          'port' => 443,
+          'scheme' => 'https',
+          'useTLS' => true,
+        ),
+        'client_options' => 
+        array (
+        ),
+      ),
+      'pusher' => 
+      array (
+        'driver' => 'pusher',
+        'key' => NULL,
+        'secret' => NULL,
+        'app_id' => NULL,
+        'options' => 
+        array (
+          'cluster' => NULL,
+          'host' => 'api-mt1.pusher.com',
+          'port' => 443,
+          'scheme' => 'https',
+          'encrypted' => true,
+          'useTLS' => true,
+        ),
+        'client_options' => 
+        array (
+        ),
+      ),
+      'ably' => 
+      array (
+        'driver' => 'ably',
+        'key' => NULL,
+      ),
+      'log' => 
+      array (
+        'driver' => 'log',
+      ),
+      'null' => 
+      array (
+        'driver' => 'null',
+      ),
+    ),
+  ),
+  'concurrency' => 
+  array (
+    'default' => 'process',
+  ),
+  'hashing' => 
+  array (
+    'driver' => 'bcrypt',
+    'bcrypt' => 
+    array (
+      'rounds' => '12',
+      'verify' => true,
+      'limit' => NULL,
+    ),
+    'argon' => 
+    array (
+      'memory' => 65536,
+      'threads' => 1,
+      'time' => 4,
+      'verify' => true,
+    ),
+    'rehash_on_login' => true,
+  ),
+  'view' => 
+  array (
+    'paths' => 
+    array (
+      0 => 'E:\\vscode\\apm2\\resources\\views',
+    ),
+    'compiled' => 'E:\\vscode\\apm2\\storage\\framework\\views',
+  ),
   'app' => 
   array (
     'name' => 'Laravel',
-    'env' => 'development',
+    'env' => 'local',
     'debug' => true,
     'url' => 'http://localhost',
     'frontend_url' => 'http://localhost:3000',
@@ -16,7 +98,7 @@
     'fallback_locale' => 'en',
     'faker_locale' => 'en_US',
     'cipher' => 'AES-256-CBC',
-    'key' => 'base64:GnvDzDoyXPo7u8nP1AtSB8LyT1WinHvbE34hwybkAsU=',
+    'key' => 'base64:+MUB+jZ6HWNZNRGx5mEYdCOuFGOP3YkbW+wxeq/5+7U=',
     'previous_keys' => 
     array (
     ),
@@ -58,6 +140,7 @@
       'Arr' => 'Illuminate\\Support\\Arr',
       'Artisan' => 'Illuminate\\Support\\Facades\\Artisan',
       'Auth' => 'Illuminate\\Support\\Facades\\Auth',
+      'Benchmark' => 'Illuminate\\Support\\Benchmark',
       'Blade' => 'Illuminate\\Support\\Facades\\Blade',
       'Broadcast' => 'Illuminate\\Support\\Facades\\Broadcast',
       'Bus' => 'Illuminate\\Support\\Facades\\Bus',
@@ -152,12 +235,12 @@
         array (
           'include' => 
           array (
-            0 => 'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2',
+            0 => 'E:\\vscode\\apm2',
           ),
           'exclude' => 
           array (
-            0 => 'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2\\vendor',
-            1 => 'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2\\node_modules',
+            0 => 'E:\\vscode\\apm2\\vendor',
+            1 => 'E:\\vscode\\apm2\\node_modules',
           ),
           'follow_links' => false,
           'ignore_unreadable_directories' => false,
@@ -182,7 +265,7 @@
           0 => 'local',
         ),
       ),
-      'temporary_directory' => 'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2\\storage\\app/backup-temp',
+      'temporary_directory' => 'E:\\vscode\\apm2\\storage\\app/backup-temp',
       'password' => NULL,
       'encryption' => 'default',
       'tries' => 1,
@@ -294,8 +377,8 @@
       'file' => 
       array (
         'driver' => 'file',
-        'path' => 'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2\\storage\\framework/cache/data',
-        'lock_path' => 'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2\\storage\\framework/cache/data',
+        'path' => 'E:\\vscode\\apm2\\storage\\framework/cache/data',
+        'lock_path' => 'E:\\vscode\\apm2\\storage\\framework/cache/data',
       ),
       'memcached' => 
       array (
@@ -380,7 +463,7 @@
       array (
         'driver' => 'sqlite',
         'url' => NULL,
-        'database' => 'secretcourier',
+        'database' => 'apm2',
         'prefix' => '',
         'foreign_key_constraints' => true,
         'busy_timeout' => NULL,
@@ -397,10 +480,10 @@
           'timeout' => 60,
         ),
         'url' => NULL,
-        'host' => 'localhost',
+        'host' => '127.0.0.1',
         'port' => '3306',
-        'database' => 'secretcourier',
-        'username' => 'secretcourier',
+        'database' => 'apm2',
+        'username' => 'root',
         'password' => 'Il@57clcw56ns',
         'unix_socket' => '',
         'charset' => 'utf8mb4',
@@ -417,10 +500,10 @@
       array (
         'driver' => 'mariadb',
         'url' => NULL,
-        'host' => 'localhost',
+        'host' => '127.0.0.1',
         'port' => '3306',
-        'database' => 'secretcourier',
-        'username' => 'secretcourier',
+        'database' => 'apm2',
+        'username' => 'root',
         'password' => 'Il@57clcw56ns',
         'unix_socket' => '',
         'charset' => 'utf8mb4',
@@ -437,10 +520,10 @@
       array (
         'driver' => 'pgsql',
         'url' => NULL,
-        'host' => 'localhost',
+        'host' => '127.0.0.1',
         'port' => '3306',
-        'database' => 'secretcourier',
-        'username' => 'secretcourier',
+        'database' => 'apm2',
+        'username' => 'root',
         'password' => 'Il@57clcw56ns',
         'charset' => 'utf8',
         'prefix' => '',
@@ -452,10 +535,10 @@
       array (
         'driver' => 'sqlsrv',
         'url' => NULL,
-        'host' => 'localhost',
+        'host' => '127.0.0.1',
         'port' => '3306',
-        'database' => 'secretcourier',
-        'username' => 'secretcourier',
+        'database' => 'apm2',
+        'username' => 'root',
         'password' => 'Il@57clcw56ns',
         'charset' => 'utf8',
         'prefix' => '',
@@ -504,7 +587,7 @@
       'local' => 
       array (
         'driver' => 'local',
-        'root' => 'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2\\storage\\app/private',
+        'root' => 'E:\\vscode\\apm2\\storage\\app/private',
         'serve' => true,
         'throw' => false,
         'report' => false,
@@ -512,7 +595,7 @@
       'public' => 
       array (
         'driver' => 'local',
-        'root' => 'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2\\storage\\app/public',
+        'root' => 'E:\\vscode\\apm2\\storage\\app/public',
         'url' => 'http://localhost/storage',
         'visibility' => 'public',
         'throw' => false,
@@ -534,7 +617,7 @@
     ),
     'links' => 
     array (
-      'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2\\public\\storage' => 'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2\\storage\\app/public',
+      'E:\\vscode\\apm2\\public\\storage' => 'E:\\vscode\\apm2\\storage\\app/public',
     ),
   ),
   'logging' => 
@@ -559,14 +642,14 @@
       'single' => 
       array (
         'driver' => 'single',
-        'path' => 'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2\\storage\\logs/laravel.log',
+        'path' => 'E:\\vscode\\apm2\\storage\\logs/laravel.log',
         'level' => 'debug',
         'replace_placeholders' => true,
       ),
       'daily' => 
       array (
         'driver' => 'daily',
-        'path' => 'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2\\storage\\logs/laravel.log',
+        'path' => 'E:\\vscode\\apm2\\storage\\logs/laravel.log',
         'level' => 'debug',
         'days' => 14,
         'replace_placeholders' => true,
@@ -631,7 +714,7 @@
       ),
       'emergency' => 
       array (
-        'path' => 'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2\\storage\\logs/laravel.log',
+        'path' => 'E:\\vscode\\apm2\\storage\\logs/laravel.log',
       ),
     ),
   ),
@@ -707,7 +790,7 @@
       'theme' => 'default',
       'paths' => 
       array (
-        0 => 'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2\\resources\\views/vendor/mail',
+        0 => 'E:\\vscode\\apm2\\resources\\views/vendor/mail',
       ),
     ),
   ),
@@ -775,9 +858,10 @@
   array (
     'stateful' => 
     array (
-      0 => 'localhost:5173',
-      1 => 'localhost:8000',
-      2 => '[::1]:5173',
+      0 => 'localhost',
+      1 => '127.0.0.1',
+      2 => '127.0.0.1:8000',
+      3 => '::1',
     ),
     'guard' => 
     array (
@@ -798,15 +882,15 @@
     array (
       'token' => NULL,
     ),
+    'resend' => 
+    array (
+      'key' => NULL,
+    ),
     'ses' => 
     array (
       'key' => '',
       'secret' => '',
       'region' => 'us-east-1',
-    ),
-    'resend' => 
-    array (
-      'key' => NULL,
     ),
     'slack' => 
     array (
@@ -822,7 +906,7 @@
     ),
     'mapbox' => 
     array (
-      'access_token' => 'pk.eyJ1IjoiZ2F2aW5qMjAwNiIsImEiOiJjbHdwejBxbzIxdnA4MmpyeWFvbXc5dXBoIn0.vMDpAGuPQkERj65pvxS2bA',
+      'access_token' => NULL,
     ),
     'tomtom' => 
     array (
@@ -835,7 +919,7 @@
     'lifetime' => 120,
     'expire_on_close' => false,
     'encrypt' => false,
-    'files' => 'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2\\storage\\framework/sessions',
+    'files' => 'E:\\vscode\\apm2\\storage\\framework/sessions',
     'connection' => NULL,
     'table' => 'sessions',
     'store' => NULL,
@@ -852,105 +936,34 @@
     'same_site' => 'lax',
     'partitioned' => false,
   ),
-  'broadcasting' => 
-  array (
-    'default' => 'log',
-    'connections' => 
-    array (
-      'reverb' => 
-      array (
-        'driver' => 'reverb',
-        'key' => NULL,
-        'secret' => NULL,
-        'app_id' => NULL,
-        'options' => 
-        array (
-          'host' => NULL,
-          'port' => 443,
-          'scheme' => 'https',
-          'useTLS' => true,
-        ),
-        'client_options' => 
-        array (
-        ),
-      ),
-      'pusher' => 
-      array (
-        'driver' => 'pusher',
-        'key' => NULL,
-        'secret' => NULL,
-        'app_id' => NULL,
-        'options' => 
-        array (
-          'cluster' => NULL,
-          'host' => 'api-mt1.pusher.com',
-          'port' => 443,
-          'scheme' => 'https',
-          'encrypted' => true,
-          'useTLS' => true,
-        ),
-        'client_options' => 
-        array (
-        ),
-      ),
-      'ably' => 
-      array (
-        'driver' => 'ably',
-        'key' => NULL,
-      ),
-      'log' => 
-      array (
-        'driver' => 'log',
-      ),
-      'null' => 
-      array (
-        'driver' => 'null',
-      ),
-    ),
-  ),
-  'concurrency' => 
-  array (
-    'default' => 'process',
-  ),
-  'hashing' => 
-  array (
-    'driver' => 'bcrypt',
-    'bcrypt' => 
-    array (
-      'rounds' => '12',
-      'verify' => true,
-      'limit' => NULL,
-    ),
-    'argon' => 
-    array (
-      'memory' => 65536,
-      'threads' => 1,
-      'time' => 4,
-      'verify' => true,
-    ),
-    'rehash_on_login' => true,
-  ),
-  'view' => 
-  array (
-    'paths' => 
-    array (
-      0 => 'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2\\resources\\views',
-    ),
-    'compiled' => 'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2\\storage\\framework\\views',
-  ),
   'inertia' => 
   array (
     'ssr' => 
     array (
       'enabled' => true,
       'url' => 'http://127.0.0.1:13714',
+      'ensure_bundle_exists' => true,
+    ),
+    'ensure_pages_exist' => false,
+    'page_paths' => 
+    array (
+      0 => 'E:\\vscode\\apm2\\resources\\js/Pages',
+    ),
+    'page_extensions' => 
+    array (
+      0 => 'js',
+      1 => 'jsx',
+      2 => 'svelte',
+      3 => 'ts',
+      4 => 'tsx',
+      5 => 'vue',
     ),
     'testing' => 
     array (
       'ensure_pages_exist' => true,
       'page_paths' => 
       array (
-        0 => 'C:\\Users\\gavin\\OneDrive\\Documents\\GitHub\\apm2\\resources\\js/Pages',
+        0 => 'E:\\vscode\\apm2\\resources\\js/Pages',
       ),
       'page_extensions' => 
       array (
